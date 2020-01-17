@@ -79,9 +79,12 @@ MODULE SolverUtils
    REAL(KIND=dp), POINTER, PRIVATE :: BoundaryNormals(:,:),  &
                                       BoundaryTangent1(:,:), &
                                       BoundaryTangent2(:,:)
-
+   REAL(KIND=dp), ALLOCATABLE, PRIVATE :: BoundaryNotNTValues(:,:)
+   LOGICAL, ALLOCATABLE, PRIVATE :: BoundaryNotNTTag(:,:)
+   
    SAVE BoundaryReorder, NormalTangentialNOFNodes, BoundaryNormals, &
-              BoundaryTangent1, BoundaryTangent2, NormalTangentialName
+       BoundaryTangent1, BoundaryTangent2, NormalTangentialName, &
+       BoundaryNotNTValues, BoundaryNotNTTag
 
 CONTAINS
 
@@ -164,6 +167,12 @@ CONTAINS
            NormalTangentialNOFNodes, BoundaryReorder, &
            BoundaryNormals, BoundaryTangent1, BoundaryTangent2, &
            dim )
+
+       IF( ALLOCATED( BoundaryNotNTValues ) ) THEN
+         BoundaryNotNTValues = 0.0_dp
+         BoundaryNotNTTag = .FALSE.
+       END IF
+
      END IF
 
      IF( AnyProj ) THEN
@@ -2127,6 +2136,7 @@ CONTAINS
      TYPE(ValueList_t), POINTER :: BC, MasterBC
      REAL(KIND=dp), POINTER :: nWrk(:,:)
      LOGICAL :: CreateDual
+     CHARACTER(*), PARAMETER :: Caller = 'DetermineContact'
 
      
      SAVE FirstTime
@@ -2170,7 +2180,7 @@ CONTAINS
      IF( ConservativeAdd ) THEN
        IF( CoupledIter == 1 ) ConservativeAdd = ( ConservativeAfterIters < NonlinIter )
        IF( ConservativeAdd ) THEN
-         CALL Info('DetermineContact','Adding dofs in conservative fashion',Level=8)
+         CALL Info(Caller,'Adding dofs in conservative fashion',Level=8)
        END IF
      END IF
 
@@ -2179,7 +2189,7 @@ CONTAINS
      IF( ConservativeRemove ) THEN
        IF( CoupledIter == 1 ) ConservativeRemove = ( ConservativeAfterIters < NonlinIter )
        IF( ConservativeRemove ) THEN
-         CALL Info('DetermineContact','Removing dofs in conservative fashion',Level=8)
+         CALL Info(Caller,'Removing dofs in conservative fashion',Level=8)
        END IF
      END IF
          
@@ -2203,7 +2213,7 @@ CONTAINS
      IF(.NOT. Found ) ValEps = EPSILON( ValEps )
 
      IF( .NOT. ASSOCIATED( Model % Solver % MortarBCs ) ) THEN
-       CALL Fatal('DetermineContact','Cannot apply contact without projectors!')
+       CALL Fatal(Caller,'Cannot apply contact without projectors!')
      END IF
 
      ! a) Create rotateted contact if needed
@@ -2229,7 +2239,7 @@ CONTAINS
 
        BC => Model % BCs(bc_ind) % Values
 
-       CALL Info('DetermineContact','Set contact for boundary: '&
+       CALL Info(Caller,'Set contact for boundary: '&
            //TRIM(I2S(bc_ind)),Level=8)
        Model % Solver % MortarBCsChanged = .TRUE.
        
@@ -2256,15 +2266,15 @@ CONTAINS
                ActiveDirection = i
              END IF
            END DO
-           CALL Info('DetermineContact','Active direction set to: '//TRIM(I2S(ActiveDirection)))
+           CALL Info(Caller,'Active direction set to: '//TRIM(I2S(ActiveDirection)))
          END IF
        ELSE IF( RotationalProjector .OR. NormalProjector ) THEN
          ActiveDirection = 1
          IF( .NOT. ThisRotatedContact ) THEN
-           CALL Warn('DetermineContact','Rotational and normal projectors should only work with N-T coordinates!')
+           CALL Warn(Caller,'Rotational and normal projectors should only work with N-T coordinates!')
          END IF
        ELSE
-         CALL Fatal('DetermineContact','Projector must be current either flat, plane, cylinder or rotational!')
+         CALL Fatal(Caller,'Projector must be current either flat, plane, cylinder or rotational!')
        END IF
       
 
@@ -2277,7 +2287,7 @@ CONTAINS
        DualProjector => Projector % Ematrix
        CreateDual = ASSOCIATED( DualProjector )
        IF( CreateDual ) THEN
-         CALL Info('DetermineContact','Using also the dual projector',Level=8)
+         CALL Info(Caller,'Using also the dual projector',Level=8)
        END IF
       
        ! If we have N-T system then the mortar condition for the master side
@@ -2286,12 +2296,12 @@ CONTAINS
          IF( master_ind > 0 ) THEN
            IF( .NOT. ListGetLogical( MasterBC, &
                'Normal-Tangential '//TRIM(VarName),Found) ) THEN
-             CALL Fatal('DetermineContact','Master boundary '//TRIM(I2S(master_ind))//&
+             CALL Fatal(Caller,'Master boundary '//TRIM(I2S(master_ind))//&
                  ' should also have N-T coordinates!')
            END IF
          END IF
 
-         CALL Info('DetermineContact','We have a normal-tangential system',Level=6)
+         CALL Info(Caller,'We have a normal-tangential system',Level=6)
          MortarBC % MasterScale = -1.0_dp
          DofN = 1
        ELSE                 
@@ -2342,7 +2352,7 @@ CONTAINS
          CASE('slide')
            SlipContact = .TRUE.
          CASE Default
-           CALL Fatal('DetermineContact','Unknown contact type: '//TRIM(ContactType))
+           CALL Fatal(Caller,'Unknown contact type: '//TRIM(ContactType))
          END SELECT
        ELSE
          StickContact = ListGetLogical( BC,'Stick Contact',Found )
@@ -2351,15 +2361,15 @@ CONTAINS
          IF(.NOT. Found ) SlipContact = ListGetLogical( BC,'Slip Contact',Found )
          IF(.NOT. Found ) SlipContact = ListGetLogical( BC,'Slide Contact',Found )
          IF(.NOT. Found ) THEN 
-           CALL Warn('DetermineContact','No contact type given, assuming > Slip Contact <')
+           CALL Warn(Caller,'No contact type given, assuming > Slip Contact <')
            SlipContact = .TRUE.
          END IF
        END IF
 
-       IF( StickContact ) CALL Info('DetermineContact','Using stick contact for displacement',Level=10)
-       IF( TieContact ) CALL Info('DetermineContact','Using tie contact for displacement',Level=10)
-       IF( FrictionContact ) CALL Info('DetermineContact','Using friction contact for displacement',Level=10)
-       IF( SlipContact ) CALL Info('DetermineContact','Using slip contact for displacement',Level=10)
+       IF( StickContact ) CALL Info(Caller,'Using stick contact for displacement',Level=10)
+       IF( TieContact ) CALL Info(Caller,'Using tie contact for displacement',Level=10)
+       IF( FrictionContact ) CALL Info(Caller,'Using friction contact for displacement',Level=10)
+       IF( SlipContact ) CALL Info(Caller,'Using slip contact for displacement',Level=10)
        
 
        ! At the start it may be beneficial to assume initial tie contact
@@ -2369,7 +2379,7 @@ CONTAINS
          IF( DoIt ) THEN
            FrictionContact = .FALSE.; StickContact = .FALSE.; SlipContact = .FALSE.
            TieContact = .TRUE.
-           CALL Info('DetermineContact','Assuming initial tie contact',Level=10)
+           CALL Info(Caller,'Assuming initial tie contact',Level=10)
          END IF
        END IF
          
@@ -2381,7 +2391,7 @@ CONTAINS
            FrictionContact = .FALSE.; StickContact = .FALSE.
            SlipContact = .TRUE.
            SkipFriction = .TRUE.
-           CALL Info('DetermineContact','Assuming frictionless initial contact',Level=10)
+           CALL Info(Caller,'Assuming frictionless initial contact',Level=10)
          END IF
        ELSE IF( ( FrictionContact .OR. SlipContact) .AND. NonlinIter == 1 ) THEN
          DoIt = ListGetLogical(BC,'Nonlinear System Initial Stick',Found )
@@ -2395,7 +2405,7 @@ CONTAINS
            FrictionContact = .FALSE.
            SlipContact = .FALSE.
            StickContact = .TRUE.
-           CALL Info('DetermineContact','Assuming sticking in first iteration initial contact',Level=10)
+           CALL Info(Caller,'Assuming sticking in first iteration initial contact',Level=10)
          END IF        
        END IF
 
@@ -2469,7 +2479,7 @@ CONTAINS
      
 
      FirstTime = .FALSE.
-     CALL Info('DetermineContact','All done',Level=10)
+     CALL Info(Caller,'All done',Level=10)
 
    CONTAINS
 
@@ -2483,7 +2493,7 @@ CONTAINS
 
        IF( .NOT. AnyRotatedContact ) RETURN
 
-       CALL Info('DetermineContact','Rotating displacement field',Level=8)
+       CALL Info(Caller,'Rotating displacement field',Level=8)
        ALLOCATE( RotatedField(Solver % Matrix % NumberOfRows ) )
        RotatedField = Var % Values
        
@@ -2519,12 +2529,12 @@ CONTAINS
        INTEGER :: i,j,k,m
 
 
-       CALL Info('DetermineContact','Determining contact load for contact problems',Level=10)
+       CALL Info(Caller,'Determining contact load for contact problems',Level=10)
 
        LoadVar => VariableGet( Model % Variables, &
            TRIM(VarName) // ' Contact Load',ThisOnly = .TRUE. )
        IF( .NOT. ASSOCIATED( LoadVar ) ) THEN
-         CALL Fatal('DetermineContact', &
+         CALL Fatal(Caller, &
              'No Loads associated with variable: '//GetVarName(Var) )
        END IF
 
@@ -2553,7 +2563,7 @@ CONTAINS
 
 
        IF( DoAllocate ) THEN
-         CALL Info('DetermineContact','Creating contact fields',Level=8)
+         CALL Info(Caller,'Creating contact fields',Level=8)
         
          ALLOCATE( BoundaryPerm(Mesh % NumberOfNodes) )
          BoundaryPerm = 0
@@ -2661,7 +2671,6 @@ CONTAINS
          DEALLOCATE( MortarBC % Diag ) 
        END IF
 
-
        ! Create the permutation that is later need in putting the diag and rhs to correct position
        ALLOCATE( Perm( SIZE( FieldPerm ) ) )
        Perm = 0
@@ -2673,7 +2682,7 @@ CONTAINS
 
        ! First time nothing is allocated
        IF( .NOT. ASSOCIATED( MortarBC % Perm ) ) THEN
-         CALL Info('DetermineContact','Allocating projector mortar vectors',Level=10)
+         CALL Info(Caller,'Allocating projector mortar vectors',Level=10)
          ALLOCATE( MortarBC % Active( totsize ), MortarBC % Rhs( totsize) )
          MortarBC % Active = .FALSE.
          MortarBC % Rhs = 0.0_dp
@@ -2739,7 +2748,7 @@ CONTAINS
          MortarBC % Diag => Diag 
        END IF
 
-       CALL Info('DetermineContact','Copied > Active < flag to changed projector',Level=8)
+       CALL Info(Caller,'Copied > Active < flag to changed projector',Level=8)
 
      END SUBROUTINE InitializeMortarVectors
 
@@ -2754,7 +2763,7 @@ CONTAINS
        INTEGER, POINTER :: Indexes(:)
        TYPE(Element_t), POINTER :: Element
        
-       CALL Info('DetermineContact','Marking interface dofs for conservative adding/removal',Level=8)
+       CALL Info(Caller,'Marking interface dofs for conservative adding/removal',Level=8)
 
        IF(.NOT. ALLOCATED( InterfaceDof ) ) THEN
          ALLOCATE( InterfaceDof( SIZE(MortarBC % Active) ) )
@@ -2795,7 +2804,7 @@ CONTAINS
        END DO
 
        n = COUNT(InterfaceDof)
-       CALL Info('DetermineContact',&
+       CALL Info(Caller,&
            'Number of interface dofs: '//TRIM(I2S(n)),Level=8)
      END SUBROUTINE MarkInterfaceDofs
      
@@ -2822,7 +2831,7 @@ CONTAINS
        LOGICAL :: LinearContactGap, DebugNormals
        
        
-       CALL Info('DetermineContact','Computing distance between mortar boundaries',Level=14)
+       CALL Info(Caller,'Computing distance between mortar boundaries',Level=14)
 
        DispVals => Solver % Variable % Values
        IF( .NOT. ASSOCIATED( DispVals ) ) THEN
@@ -2838,7 +2847,7 @@ CONTAINS
          ELSE
            PrevDispVals => Solver % Variable % PrevValues(:,3)
          END IF
-         IF(.NOT. ASSOCIATED( PrevDispVals ) ) CALL Fatal('DetermineContact',&
+         IF(.NOT. ASSOCIATED( PrevDispVals ) ) CALL Fatal(Caller,&
              'Previous displacement field required!')
        END IF
 
@@ -3172,7 +3181,7 @@ CONTAINS
              END DO
              
            CASE DEFAULT
-             CALL Fatal('DetermineContact','Implement linear gaps for: '//TRIM(I2S(ElemCode)))
+             CALL Fatal(Caller,'Implement linear gaps for: '//TRIM(I2S(ElemCode)))
            END SELECT
          END DO
        END IF
@@ -3348,20 +3357,20 @@ CONTAINS
              END DO
                
            CASE DEFAULT
-             CALL Fatal('DetermineContact','Implement linear loads for: '//TRIM(I2S(ElemCode)))
+             CALL Fatal(Caller,'Implement linear loads for: '//TRIM(I2S(ElemCode)))
            END SELECT
          END DO
        END IF
        
        IF( FlatProjector .OR. PlaneProjector ) THEN
          IF( NormalCount == 0 ) THEN
-           CALL Info('DetermineContact','All normals are consistently signed',Level=10)
+           CALL Info(Caller,'All normals are consistently signed',Level=10)
          ELSE
-           CALL Warn('DetermineContact','There are normals with conflicting signs: '&
+           CALL Warn(Caller,'There are normals with conflicting signs: '&
                //TRIM(I2S(NormalCount) ) )
            NormalSign = 1
          END IF
-         CALL Info('DetermineContact','Normal direction for distance measure: '&
+         CALL Info(Caller,'Normal direction for distance measure: '&
              //TRIM(I2S(NormalSign)),Level=8)
          DistSign = NormalSign 
        END IF
@@ -3472,23 +3481,23 @@ CONTAINS
 
        IF ( -HUGE(MaxDist) /= MaxDist ) THEN
           IF( MaxDist - MinDist >= 0.0_dp ) THEN
-             PRINT *,'NormalContactSet Dist:',MinDist,MaxDist
+             PRINT *,'NormalContact Dist:',MinDist,MaxDist
           END IF
        END IF
        IF ( -HUGE(MaxLoad) /= MaxLoad) THEN
           IF( MaxLoad - MinLoad >= 0.0_dp ) THEN
-             PRINT *,'NormalContactSet Load:',MinLoad,MaxLoad
+             PRINT *,'NormalContact Load range:',MinLoad,MaxLoad
           END IF
        END IF
 
        IF(added > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Added ',added,' nodes to the set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
        
        IF(removed > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Removed ',removed,' nodes from the set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
 
      END SUBROUTINE NormalContactSet
@@ -3516,9 +3525,9 @@ CONTAINS
 
        WRITE(Message,'(A,I0)') 'Initial number of contact nodes for '&
            //TRIM(VarName)//': ',LimitedNow 
-       CALL Info('DetermineContactSet',Message,Level=5)
+       CALL Info(Caller,Message,Level=5)
 
-       CALL Info('DetermineContact',&
+       CALL Info(Caller,&
            'Setting '//TRIM(I2S(NewNodes))//' additional contact nodes',Level=5)
 
        ALLOCATE( DistArray( NewNodes ), IndArray( NewNodes ) ) 
@@ -3554,11 +3563,11 @@ CONTAINS
        END DO
 
        IF( ANY( IndArray == 0 ) ) THEN
-         CALL Fatal('DetermineContact','Could not define sufficient number of new nodes!')
+         CALL Fatal(Caller,'Could not define sufficient number of new nodes!')
        END IF
 
        WRITE(Message,'(A,ES12.4)') 'Maximum distance needed for new nodes:',DistArray(NewNodes)
-       CALL Info('DetermineContact',Message,Level=8)
+       CALL Info(Caller,Message,Level=8)
 
        MortarBC % Active( Dofs*(IndArray-1)+DofN ) = .TRUE.
 
@@ -3600,7 +3609,7 @@ CONTAINS
            mustatic = ListGetRealAtNode( BC,'Static Friction Coefficient', j )
            mudynamic = ListGetRealAtNode( BC,'Dynamic Friction Coefficient', j )
            IF( mustatic <= mudynamic ) THEN
-             CALL Warn('TangentContactSet','Static friction coefficient should be larger than dynamic!')
+             CALL Warn(Caller,'Static friction coefficient should be larger than dynamic!')
            END IF
            
            Fstatic = Fstatic + mustatic * ABS( NodeLoad ) 
@@ -3631,7 +3640,7 @@ CONTAINS
          GOTO 100
        END IF
 
-       CALL Info('TangentContactSet','Setting the stick set tangent components',Level=10)
+       CALL Info(Caller,'Setting the stick set tangent components',Level=10)
 
        Removed0 = 0
        Removed = 0
@@ -3690,7 +3699,7 @@ CONTAINS
          mudynamic = ListGetRealAtNode( BC,'Dynamic Friction Coefficient', j )
 
          IF( mustatic <= mudynamic ) THEN
-           CALL Warn('TangentContactSet','Static friction coefficient should be larger than dynamic!')
+           CALL Warn(Caller,'Static friction coefficient should be larger than dynamic!')
          END IF
 
          IF( MortarBC % Active(IndT1) ) THEN
@@ -3721,21 +3730,21 @@ CONTAINS
 
        IF(added > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Added ',added,' nodes to the stick set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
        
        IF(removed0 > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Removed ',removed0,' non-contact nodes from the stick set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
 
        IF(removed > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Removed ',removed,' sliding nodes from the stick set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
 
 
-100    CALL Info('DetermineContactSet','Creating fields out of normal and stick contact sets',Level=10)
+100    CALL Info(Caller,'Creating fields out of normal and stick contact sets',Level=10)
 
        DO i = 1, Projector % NumberOfRows
          j = Projector % InvPerm(i)
@@ -3926,14 +3935,14 @@ CONTAINS
            END IF
 
          CASE DEFAULT
-           CALL Fatal('NormalContactSet','Cannot deal with element: '//TRIM(I2S(elemcode)))
+           CALL Fatal(Caller,'Cannot deal with element: '//TRIM(I2S(elemcode)))
 
          END SELECT
        END DO
 
        IF(added > 0) THEN
          WRITE(Message,'(A,I0,A)') 'Added ',added,' quadratic nodes to contact set'
-         CALL Info('DetermineContactSet',Message,Level=5)
+         CALL Info(Caller,Message,Level=5)
        END IF
 
        IF(removed > 0) THEN
@@ -3956,7 +3965,7 @@ CONTAINS
        REAL(KIND=dp), ALLOCATABLE :: CoeffTable(:), RealActive(:)
        INTEGER :: i,j,k,l,l2
 
-       CALL Info('DetermineContact','Mapping entities from slave to master',Level=10)
+       CALL Info(Caller,'Mapping entities from slave to master',Level=10)
 
        ALLOCATE( SlaveNode( Mesh % NumberOfNodes ) ) 
        SlaveNode = .FALSE.
@@ -4093,12 +4102,12 @@ CONTAINS
 
        IF(.NOT. ListCheckPresent( BC, 'Dynamic Friction Coefficient') ) RETURN
       
-       CALL Info('DetermineContact','Setting contact friction for boundary',Level=10)
+       CALL Info(Caller,'Setting contact friction for boundary',Level=10)
 
        GivenDirection = ListCheckPresent( BC,'Contact Velocity')
        IF(.NOT. GivenDirection ) THEN
          IF(.NOT. ASSOCIATED( VeloVar ) ) THEN
-           CALL Fatal('DetermineContact','Contact velocity must be given in some way')
+           CALL Fatal(Caller,'Contact velocity must be given in some way')
          END IF
        END IF
 
@@ -4242,7 +4251,7 @@ CONTAINS
        END DO
        
        n = COUNT( NodeDone ) 
-       CALL Info('SetSlideFriction','Number of friction nodes: '//TRIM(I2S(n)),Level=10)
+       CALL Info(Caller,'Number of friction nodes: '//TRIM(I2S(n)),Level=10)
        
        DEALLOCATE( NodeDone )
 
@@ -4580,7 +4589,7 @@ CONTAINS
     ! check and set some flags for nodes belonging to n-t boundaries
     ! getting set by other bcs:
     ! --------------------------------------------------------------
-    IF ( NormalTangentialNOFNodes>0 ) THEN
+    IF ( NormalTangentialNOFNodes > 0 ) THEN
       IF ( OrderByBCNumbering ) THEN
         DO i=1,Model % NumberOfBCs
           BC = i
@@ -5345,9 +5354,9 @@ CONTAINS
 !------------------------------------------------------------------------------
       INTEGER :: n,elno
       INTEGER :: i,j,k,l,m,dim,kmax,lmax
-      LOGICAL :: CheckNT,found
+      LOGICAL :: CheckNT,ThisNT,found
       REAL(KIND=dp) :: Condition(n), Work(n), RotVec(3)
-      
+
       dim = CoordinateSystemDimension()
 
       IF ( DOF > 0 ) THEN
@@ -5362,77 +5371,66 @@ CONTAINS
       ELSE
         CALL ListGetRealArray( ValueList, Name, WorkA, n, Indexes, gotIt )
       END IF
-      
-      IF ( gotIt ) THEN
-        IF ( Conditional ) THEN
-          IF (Model % Solver % DG) THEN
-            Condition(1:n) = ListGetReal( ValueList, CondName, n, Element % NodeIndexes, gotIt )
-          ELSE
-            Condition(1:n) = ListGetReal( ValueList, CondName, n, Indexes, gotIt )
-          END IF
-          Conditional = Conditional .AND. GotIt
-        END IF
 
-       !
-       ! Check for nodes belonging to n-t boundary getting set by other bcs.
-       ! -------------------------------------------------------------------
-        CheckNT = .FALSE.
-        IF ( NormalTangentialNOFNodes>0 .AND. DOF>0 ) THEN
-          CheckNT = .TRUE.
-          IF ( ALL(BoundaryReorder(Indexes(1:n))<1) ) CheckNT = .FALSE.
-          IF ( ListGetLogical(ValueList,NormalTangentialName,Found)) CheckNT=.FALSE.
+      IF ( .NOT. gotIt ) RETURN
+
+      IF ( Conditional ) THEN
+        IF (Model % Solver % DG) THEN
+          Condition(1:n) = ListGetReal( ValueList, CondName, n, Element % NodeIndexes, gotIt )
+        ELSE
+          Condition(1:n) = ListGetReal( ValueList, CondName, n, Indexes, gotIt )
         END IF
+        Conditional = Conditional .AND. GotIt
+      END IF
+
+#if 1
+      CheckNT = ( NormalTangentialNOFNodes > 0 )            
+
+      IF( CheckNt ) THEN
+        ThisNT = ListGetLogical(ValueList,NormalTangentialName,Found)
         
         DO j=1,n
           IF ( Conditional .AND. Condition(j) < 0.0d0 ) CYCLE
-
           k = Perm(Indexes(j))
+
           IF ( k > 0 ) THEN
-            
-            IF ( DOF>0 ) THEN
-              m = 0
-              IF ( NormalTangentialNOFNodes>0 ) m=BoundaryReorder(Indexes(j))
-              IF ( m>0 .AND. CheckNT ) THEN
-                RotVec = 0._dp
-                RotVec(DOF) = 1._dp
-                CALL RotateNTSystem( RotVec, Indexes(j) )
-
-                ! When cartesian component "DOF" is defined set the N-T component
-                ! closest to its direction. 
-                kmax = 1 
-                DO k=2,dim
-                  IF ( ABS(RotVec(k)) > ABS(RotVec(kmax)) ) THEN
-                    kmax = k
-                  END IF
-                END DO
-
-                lmax = NDOFs * (Perm(Indexes(j))-1) + kmax
-                IF ( .NOT. NTZeroing_done(m,kmax) ) THEN
-                  NTZeroing_done(m,kmax) = .TRUE.
-                  b(lmax) = 0._dp
-
-                  IF( .NOT. OffDiagonal ) THEN
-                    b(lmax) = b(lmax) + Work(j) !/DiagScaling(lmax)
-                  END IF
-
-                  ! Consider all components of the cartesian vector mapped to the 
-                  ! N-T coordinate system. Should this perhaps have scaling included?
-                  DirCount = DirCount + 1
-                  CALL ZeroRow( A,lmax )
-                  IF( .NOT. OffDiagonal) THEN
-                    DO k=1,dim
-                      l = NDOFs * (Perm(Indexes(j))-1) + k
-                      CALL SetMatrixElement( A,lmax,l,RotVec(k) )
-                    END DO
-                  END IF
-                  NTZeroing_done(m,kmax)   = .TRUE.
-                  A % ConstrainedDOF(lmax) = .FALSE.
-                END IF
-              ELSE
+            IF ( DOF>0 ) THEN              
+              m = NDOFs * (k-1) + DOF
+              IF( ThisNt .OR. BoundaryReorder(Indexes(j)) < 1 ) THEN
+                ! Always set N-T values
                 DirCount = DirCount + 1
                 CALL SetSinglePoint(k,DOF,Work(j),.FALSE.)
+                A % ConstrainedDOF(m) = .TRUE.
+              ELSE
+                ! Set other Dirichlet values only if N-T values have not been set
+                DirCount = DirCount + 1
+                CALL SetSinglePointNt(Indexes(j),DOF,Work(j))
               END IF
-            ELSE
+            ELSE            
+              DO l=1,MIN( NDOFs, SIZE(WorkA,1) )
+                m = NDOFs * (k-1) + l
+                IF( ThisNt .OR. BoundaryReorder(Indexes(j)) < 1 ) THEN
+                  DirCount = DirCount + 1
+                  CALL SetSinglePoint(k,l,WorkA(l,1,j),.FALSE.)
+                  A % ConstrainedDOF(m) = .TRUE.
+                ELSE
+                  DirCount = DirCount + 1
+                  CALL SetSinglePointNt(Indexes(j),l,WorkA(l,1,j))
+                END IF
+              END DO
+            END IF
+          END IF
+        END DO
+      ELSE
+        DO j=1,n
+          IF ( Conditional .AND. Condition(j) < 0.0d0 ) CYCLE
+          k = Perm(Indexes(j))
+          
+          IF ( k > 0 ) THEN
+            IF ( DOF>0 ) THEN
+              DirCount = DirCount + 1
+              CALL SetSinglePoint(k,DOF,Work(j),.FALSE.)
+            ELSE            
               DO l=1,MIN( NDOFs, SIZE(WorkA,1) )
                 DirCount = DirCount + 1
                 CALL SetSinglePoint(k,l,WorkA(l,1,j),.FALSE.)
@@ -5441,6 +5439,79 @@ CONTAINS
           END IF
         END DO
       END IF
+#else
+      
+      ! Check for nodes belonging to n-t boundary getting set by other bcs.
+      ! -------------------------------------------------------------------
+      CheckNT = ( NormalTangentialNOFNodes>0 .AND. DOF>0 )
+
+      IF( CheckNT ) THEN
+        IF ( ALL(BoundaryReorder(Indexes(1:n))<1) ) CheckNT = .FALSE.
+        IF ( ListGetLogical(ValueList,NormalTangentialName,Found)) CheckNT=.FALSE.
+      END IF
+
+      DO j=1,n
+        IF ( Conditional .AND. Condition(j) < 0.0d0 ) CYCLE
+
+        k = Perm(Indexes(j))
+        IF ( k > 0 ) THEN
+
+          IF ( DOF>0 ) THEN
+            m = 0
+            IF ( NormalTangentialNOFNodes>0 ) m=BoundaryReorder(Indexes(j))
+
+            ! BUG: when n-t related to mortars Dirichlet should always prevail
+
+            IF ( m>0 .AND. CheckNT ) THEN
+              RotVec = 0._dp
+              RotVec(DOF) = 1._dp
+              CALL RotateNTSystem( RotVec, Indexes(j) )
+
+              ! When cartesian component "DOF" is defined set the N-T component
+              ! closest to its direction. 
+              kmax = 1 
+              DO k=2,dim
+                IF ( ABS(RotVec(k)) > ABS(RotVec(kmax)) ) THEN
+                  kmax = k
+                END IF
+              END DO
+
+              lmax = NDOFs * (Perm(Indexes(j))-1) + kmax
+              IF ( .NOT. NTZeroing_done(m,kmax) ) THEN
+                NTZeroing_done(m,kmax) = .TRUE.
+                b(lmax) = 0._dp
+
+                IF( .NOT. OffDiagonal ) THEN
+                  b(lmax) = b(lmax) + Work(j)
+                END IF
+
+                ! Consider all components of the cartesian vector mapped to the 
+                ! N-T coordinate system. 
+                DirCount = DirCount + 1
+                CALL ZeroRow( A,lmax )
+                IF( .NOT. OffDiagonal) THEN
+                  DO k=1,dim
+                    l = NDOFs * (Perm(Indexes(j))-1) + k
+                    CALL SetMatrixElement( A,lmax,l,RotVec(k) )
+                  END DO
+                END IF
+                NTZeroing_done(m,kmax)   = .TRUE.
+                A % ConstrainedDOF(lmax) = .FALSE.
+              END IF
+            ELSE
+              DirCount = DirCount + 1
+              CALL SetSinglePoint(k,DOF,Work(j),.FALSE.)
+            END IF
+          ELSE
+            DO l=1,MIN( NDOFs, SIZE(WorkA,1) )
+              DirCount = DirCount + 1
+              CALL SetSinglePoint(k,l,WorkA(l,1,j),.FALSE.)
+            END DO
+          END IF
+        END IF
+      END DO
+#endif
+      
 !------------------------------------------------------------------------------
     END SUBROUTINE SetElementValues
 !------------------------------------------------------------------------------
@@ -5599,7 +5670,30 @@ CONTAINS
     END SUBROUTINE SetSinglePoint
 !------------------------------------------------------------------------------
 
+!------------------------------------------------------------------------------
+!> Set values related to one single point
+!------------------------------------------------------------------------------
+    SUBROUTINE SetSinglePointNt(ind,DOF,val)
+!------------------------------------------------------------------------------
+      INTEGER :: ind, DOF
+      REAL(KIND=dp) :: val
 
+      INTEGER :: n
+
+      IF(.NOT. ALLOCATED(BoundaryNotNTValues) ) THEN
+        n = NormalTangentialNOFNodes         
+        ALLOCATE( BoundaryNotNTValues(n,3), BoundaryNotNTTag(n,3) )
+        BoundaryNotNTValues = 0.0_dp
+        BoundaryNotNTTag = .FALSE.
+      END IF
+      
+      BoundaryNotNTValues(ind,DOF) = val
+      BoundaryNotNTTag(ind,DOF) = .TRUE.
+      
+    END SUBROUTINE SetSinglePointNt
+!------------------------------------------------------------------------------
+
+    
 !------------------------------------------------------------------------------
 !> Set values related to upper and lower limiters.
 !------------------------------------------------------------------------------
@@ -7477,6 +7571,79 @@ CONTAINS
       IF(.NOT. Found) DirichletComm = .TRUE.
       IF( DirichletComm) CALL CommunicateDirichletBCs(A)
     END IF
+
+
+    IF( ALLOCATED(BoundaryNotNTValues) ) THEN
+      PRINT *,'doing a few nt values:',COUNT(BoundaryNotNTTag(:,1)) 
+      BLOCK
+        TYPE(Mesh_t), POINTER :: Mesh
+        REAL(KIND=dp) :: DVec(3), NtVec(3), RotVec(3)
+        LOGICAL :: Dset(3), NtSet(3)
+        INTEGER :: jb, jd, k, l, dofs
+        
+        Mesh => Solver % Mesh
+        dofs = Solver % Variable % dofs
+        
+        DO i=1, Mesh % NumberOfNodes
+          ! Permutation of n-t boundary
+          jb = BoundaryReorder(i)
+          IF( jb == 0 ) CYCLE
+
+          ! Permutation of displacement/velocity vector
+          jd = Solver % Variable % Perm(i)
+          IF( jd == 0 ) CYCLE
+
+          ! Ok, study n-t conditions for this node
+          DO k=1,MIN(dofs,3)
+            l = dofs * (i-1) + k
+            NtVec(k) = A % DValues(l)
+            NtSet(k) = A % ConstrainedDof(l)
+
+            Dset(k) = BoundaryNotNtTag(jb,k)
+            DVec(k) = BoundaryNotNtValues(jb,k)
+          END DO
+
+          ! No Dirichlet nodes that would not be gievn in n-t 
+          IF( .NOT. ANY(DSet .AND. .NOT. NtSet) ) CYCLE
+
+          ! Ok, so we have node on a n-t boundary with Dirichlet conditions
+          ! given in NON n-t way. Lets fix them!
+          
+          ! Only rotate the components not given by already n-t conditions
+          RotVec = DVec
+          CALL RotateNTSystem( RotVec, i )
+
+          PRINT *,'Rotated:',i,DVec,RotVec
+          
+          IF( ALL( Dset ) ) THEN            
+            DO k=1,MIN(dofs,3)
+              IF( NtSet(k) ) CYCLE
+              l = dofs * (i-1) + k
+              A % DValues(l) = RotVec(k) 
+              A % ConstrainedDOF(l) = .TRUE.
+            END DO
+          ELSE
+            
+            CALL Fatal('','code some more!')
+          
+#if 0
+            ! When cartesian component "DOF" is defined set the N-T component
+            ! closest to its direction. 
+            kmax = 1 
+            DO k=2,dim
+              IF ( ABS(RotVec(k)) > ABS(RotVec(kmax)) ) THEN
+                kmax = k
+              END IF
+            END DO
+            
+            IF( .NOT. OffDiagonal ) THEN
+              b(lmax) = b(lmax) + Work(j)
+            END IF
+#endif
+          END IF
+        END DO
+      END BLOCK
+    END IF
     
     ! Eliminate all entries in matrix that may be eliminated in one sweep
     ! If this is an offdiagonal entry this cannot be done.  
@@ -7845,8 +8012,12 @@ CONTAINS
       BoundaryNormals  = 0.0d0
       BoundaryTangent1 = 0.0d0
       BoundaryTangent2 = 0.0d0
+
+      CALL Info('CheckNormalTangentialBoundary',&
+          'Found n-t boundary nodes: '//TRIM(I2S(NumberOfBoundaryNodes)),Level=8)
     END IF
 
+    
 !------------------------------------------------------------------------------
   END SUBROUTINE CheckNormalTangentialBoundary
 !------------------------------------------------------------------------------
@@ -14323,7 +14494,7 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
      AddVector(:), Tvals(:), Vals(:)
   REAL(KIND=dp), POINTER  :: MultiplierValues(:)
   REAL(KIND=dp), ALLOCATABLE, TARGET :: CollectionSolution(:), TotValues(:)
-  INTEGER :: NumberOfRows, NumberOfValues, MultiplierDOFs, istat, NoEmptyRows 
+  INTEGER :: NumberOfRows, NumberOfValues, MultiplierDOFs, istat, NoEmptyRows, ElimCount
   INTEGER :: i, j, k, l, m, n, p,q, ix, Loop
   TYPE(Variable_t), POINTER :: MultVar
   REAL(KIND=dp) :: scl, rowsum
@@ -14481,6 +14652,8 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
         //TRIM(I2S(SIZE(RestMatrix % Values))),Level=12)
 
     NoEmptyRows = 0
+    ElimCount = 0
+    
     ConstraintScaling = ListGetLogical(Solver % Values, 'Constraint Scaling',Found)
     IF(ConstraintScaling) THEN
       rowsum = ListGetConstReal( Solver % Values, 'Constraint Scale', Found)
@@ -14492,6 +14665,7 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
     DO i=1,SIZE(Solver % Variable % Perm)
       IF ( Solver % Variable % Perm(i)>0) Iperm(Solver % Variable % Perm(i))=i
     END DO
+
 
     DO i=RestMatrix % NumberOfRows,1,-1
 
@@ -14525,10 +14699,10 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
             RestMatrix % RHS(i) = RestMatrix % RHS(i) / rowsum
           END IF
         END IF
-
+         
         DO j=RestMatrix % Rows(i+1)-1,RestMatrix % Rows(i),-1
           Found = .TRUE.
-
+          
           ! Skip non-positive column indexes
           IF( RestMatrix % Cols(j) <= 0 ) CYCLE
           IF ( .NOT. ComplexSystem ) THEN
@@ -14536,8 +14710,12 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
           END IF
 
           IF (EnforceDirichlet .AND. RestMatrix % Cols(j) <= StiffMatrix % NumberOfRows) &
-                  Found = .NOT.StiffMatrix % ConstrainedDOF(RestMatrix % Cols(j))
+              Found = .NOT.StiffMatrix % ConstrainedDOF(RestMatrix % Cols(j))
+!          IF (EnforceDirichlet .AND. RestMatrix % Cols(j) <= StiffMatrix % NumberOfRows) &
+!              Found = .NOT.StiffMatrix % ConstrainedDOF(RestMatrix % InvPerm(i))
 
+          IF(.NOT. Found ) ElimCount = ElimCount + 1
+          
           IF(Found) THEN
             IF (ASSOCIATED(RestMatrix % TValues)) THEN
               CALL AddToMatrixElement( CollectionMatrix, &
@@ -14610,13 +14788,16 @@ RECURSIVE SUBROUTINE SolveWithLinearRestriction( StiffMatrix, ForceVector, Solut
         END IF
       END IF
     END DO
-
+    
     IF( NoEmptyRows > 0 ) THEN
       CALL Info('SolveWithLinearRestriction',&
-          'Constraint Matrix in partition '//TRIM(I2S(ParEnv % MyPe))// &
-          ' has '//TRIM(I2S(NoEmptyRows))// &
+          'Constraint Matrix has '//TRIM(I2S(NoEmptyRows))// &
           ' empty rows out of '//TRIM(I2S(RestMatrix % NumberOfRows)), &
 	  Level=6 )
+    END IF
+    IF( ElimCount > 0 ) THEN
+      CALL Info('SolveWithLinearRestriction',&
+          'Number of entries eliminated by Dirichlet '//TRIM(I2S(ElimCount)))
     END IF
 
     CALL Info('SolveWithLinearRestriction',&
@@ -17659,7 +17840,7 @@ CONTAINS
 
          MortarBC => Solver % MortarBCs(bc_ind) 
          Atmp => MortarBC % Projector
-
+         
          IF( .NOT. ASSOCIATED( Atmp ) ) CYCLE
 
          IF(.NOT. AllocationsDone ) THEN
