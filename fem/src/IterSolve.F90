@@ -923,8 +923,62 @@ CONTAINS
     ELSE
       CALL Info('IterSolver','Calling real valued iterative solver',Level=32)
 
-      CALL IterCall( iterProc, x, b, ipar, dpar, work, &
-          mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
+      IF( ListGetLogical(Params,'Time Parallel Aperiodic', GotIt ) ) THEN
+        BLOCK
+          INTEGER :: nsent, nloops, k
+          REAL(KIND=dp) :: xcum(          
+          REAL(KIND=dp), DIMENSION(:), TARGET CONTIG :: x0,b0
+          LOGICAL :: FirstTime, LastTime
+
+          FirstTime = ( ParEnv % MyPe == 0 ) 
+          LastTime = ( ParEnv % MyPe == ParEnv % PEs-1 )
+          
+          nsent = ListGetInteger( Params,'Time Parallel Sent Interval',GotIt)
+          nloops =  HUTI_MAXITER / nsent
+          HUTI_MAXITER = nsent
+
+          ALLOCATE(xcum(SIZE(x)),bcum(SIZE(b)))
+          bcum = b
+          xcum = 0.0_dp
+          prevx0 = 0.0_dp
+
+          prevx => Solver % Variable % PrevValues(:,1)
+          
+          pValues => A % Values 
+          A % Values => A % MassValues        
+          CALL MatrixVectorMultiply( A, prevx, r0 )            
+          r0 = r0 / dt
+          b0 = b0 - r0 
+          A % Values => TmpValues            
+
+          dx = x
+          DO k=1,nloops
+            CALL IterCall( iterProc, dx, b, ipar, dpar, work, &
+                mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
+            x = x + dx
+            
+            CALL CommunicateAperiodicSolution(n,xcum,prevx)
+                        
+            ! get solution
+            ! b = b - A*x0 - (M/dt)*dx_{i-1}
+            
+            CALL MatrixVectorMultiply( A, x, r)
+            b = b0 - r
+            
+            pValues => A % Values 
+            A % Values => A % MassValues
+            
+            CALL MatrixVectorMultiply( A, prevx, r)            
+            r = r / dt
+            b = b + r  
+            A % Values => TmpValues                                    
+          END DO
+                               
+        END BLOCK
+      ELSE     
+        CALL IterCall( iterProc, x, b, ipar, dpar, work, &
+            mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
+      END IF
     ENDIF
 
     GlobalMatrix => SaveGlobalM
@@ -964,6 +1018,59 @@ CONTAINS
       DEALLOCATE( work )
     END IF
 
+  CONTAINS
+
+
+    
+
+    
+     SUBROUTINE CommunicateAperiodicSolution(n,x,prevx)
+       REAL(KIND=dp), POINTER :: x(:),prevx(:,:)
+       INTEGER :: n
+       
+       INTEGER :: toproc, fromproc
+       INTEGER :: mpistat(MPI_STATUS_SIZE), ierr
+       REAL(KIND=dp), ALLOCATABLE :: tovals(:), fromvals(:)
+       INTEGER :: rank, size, Nslices
+       INTEGER :: mpitag
+       INTEGER, SAVE :: VisitedTimes = 0
+
+       VisitedTimes = VisitedTimes + 1
+
+       CALL Info(Caller,'Communicating data between time segments!',Level=5)
+       
+       ! Sent data forward in time.
+       ! For multislice model the offset to next/previous partition is bigger. 
+       Nslices = ListGetInteger( CurrentModel % Simulation,'Number of Slices',Found )
+       IF(.NOT. Found) Nslices = 1
+              
+       toproc = MODULO( ParEnv % MyPe + Nslices, ParEnv % PEs )
+       fromproc = MODULO( ParEnv % MyPe - Nslices, ParEnv % PEs )
+            
+       ALLOCATE( tovals(n), fromvals(n) )
+
+       !PRINT *,'TimeError'//TRIM(I2S(ParEnv % Mype))//':',VisitedTimes, SUM(ABS(x-tovals))/SUM(ABS(x))
+
+       tovals = x         
+       CALL CheckBuffer( 2*n+n*MPI_BSEND_OVERHEAD )
+
+       IF(.NOT. LastTime ) THEN
+         CALL MPI_BSEND( tovals, n, MPI_DOUBLE_PRECISION, &
+             toproc, 2005, MPI_COMM_WORLD, ierr )
+       END IF
+       IF(.NOT. FirstTime ) THEN
+         CALL MPI_RECV( fromvals, n, MPI_DOUBLE_PRECISION, &
+             fromproc, 2005, MPI_COMM_WORLD, mpistat, ierr )
+       END IF
+         
+       prevx(:,1) = fromvals 
+
+       DEALLOCATE( tovals, fromvals ) 
+
+     END SUBROUTINE CommunicateCyclicSolution
+   
+
+    
 !------------------------------------------------------------------------------
   END SUBROUTINE IterSolver
 !------------------------------------------------------------------------------
