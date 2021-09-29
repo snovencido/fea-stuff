@@ -2209,7 +2209,7 @@ END INTERFACE
      REAL(KIND=dp) :: newtime, prevtime=0, maxtime, exitcond
      INTEGER, SAVE :: PrevMeshI = 0
      INTEGER :: nPeriodic, nSlices, nTimes, iSlice, iTime
-     LOGICAL :: ParallelTime, ParallelSlices
+     LOGICAL :: ParallelTime, ParallelSlices, ParallelAsync
      
      !$OMP PARALLEL
      IF(.NOT.GaussPointsInitialized()) CALL GaussPointsInit()
@@ -2250,6 +2250,10 @@ END INTERFACE
      cum_Timestep = 0
      ddt = -1.0_dp
 
+     ! For asyncronous parallel timestepping
+     ParallelAsync = ListGetLogical( CurrentModel % Simulation,'Parallel Async', GotIt ) &
+         .AND. ( ParEnv % PEs > 1 ) 
+
      ! For parallel timestepping we need to divide the periodic timesteps for each partition. 
      ParallelTime = ListGetLogical( CurrentModel % Simulation,'Parallel Timestepping', GotIt ) &
          .AND. ( ParEnv % PEs > 1 ) 
@@ -2258,7 +2262,7 @@ END INTERFACE
      ParallelSlices = ListGetLogical( CurrentModel % Simulation,'Parallel Slices',GotIt ) &
          .AND. ( ParEnv % PEs > 1 )
 
-     IF( ParallelTime .OR. ParallelSlices ) THEN
+     IF( ParallelTime .OR. ParallelSlices .OR. ParallelAsync ) THEN
        IF(.NOT. ListGetLogical( CurrentModel % Simulation,'Single Mesh',GotIt ) ) THEN
          CALL Fatal('ExecSimulation','Parallel time and slices only available with "Single Mesh"')
        END IF
@@ -2270,7 +2274,7 @@ END INTERFACE
      iTime = 0
      iSlice = 0 
      
-     IF( ParallelTime .AND. ParallelSlices ) THEN
+     IF( ( ParallelTime .OR. ParallelAsync ) .AND. ParallelSlices ) THEN
        nSlices = ListGetInteger( CurrentModel % Simulation,'Number Of Slices',GotIt)
        IF(GotIt) THEN
          IF( nSlices > ParEnv % PEs ) THEN
@@ -2290,7 +2294,7 @@ END INTERFACE
        CALL ListAddInteger( CurrentModel % Simulation,'Number Of Times',nTimes )
        iSlice = MODULO( ParEnv % MyPe, nSlices ) 
        iTime = ParEnv % MyPe / nSlices
-     ELSE IF( ParallelTime ) THEN
+     ELSE IF( ParallelTime .OR. ParallelAsync ) THEN
        nTimes = ParEnv % PEs
        iTime = ParEnv % MyPe
        CALL ListAddInteger( CurrentModel % Simulation,'Number Of Times',nTimes )
@@ -2476,18 +2480,22 @@ END INTERFACE
 !------------------------------------------------------------------------------
          sTime(1) = sTime(1) + dt
 
-         IF( nPeriodic > 0 ) THEN
-           IF( ParallelTime ) THEN
-             timePeriod = nTimes * nPeriodic * dt                        
-             IF( cum_Timestep == 1 ) THEN
-               sTime(1) = sTime(1) + iTime * nPeriodic * dt
-             ELSE IF( MODULO( cum_Timestep, nPeriodic ) == 1 ) THEN
-               CALL Info('ExecSimulation','Making jump in time-parallel scheme!')
-               sTime(1) = sTime(1) + nPeriodic * (nTimes - 1) * dt
-             END IF
+         IF( ParallelAsync ) THEN
+           IF( cum_Timestep == 1 ) THEN
+             sTime(1) = sTime(1) + iTime * dt
            ELSE
-             timePeriod = nPeriodic * dt           
+             sTime(1) = sTime(1) + (nTimes-1) * dt
            END IF
+         ELSE IF( ParallelTime ) THEN
+           timePeriod = nTimes * nPeriodic * dt                        
+           IF( cum_Timestep == 1 ) THEN
+             sTime(1) = sTime(1) + iTime * nPeriodic * dt
+           ELSE IF( MODULO( cum_Timestep, nPeriodic ) == 1 ) THEN
+             CALL Info('ExecSimulation','Making jump in time-parallel scheme!')
+             sTime(1) = sTime(1) + nPeriodic * (nTimes - 1) * dt
+           END IF
+         ELSE IF( nPeriodic > 0 ) THEN
+           timePeriod = nPeriodic * dt           
          END IF
                   
          sPeriodic(1) = sTime(1)         

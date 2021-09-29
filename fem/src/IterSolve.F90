@@ -35,6 +35,7 @@
 ! ****************************************************************************/
 
 #include "huti_fdefs.h"
+#include "../config.h"
 
 !> \ingroup ElmerLib 
 !> \{
@@ -48,12 +49,15 @@
 !------------------------------------------------------------------------------
 MODULE IterSolve
 
+   USE Types 
    USE Lists
    USE CRSMatrix
    USE BandMatrix
    USE IterativeMethods
+  USE SParIterGlobals
+  USE SParIterComm
    USE huti_sfe
-
+   
    IMPLICIT NONE
 
    !/*
@@ -197,8 +201,20 @@ CONTAINS
     INTEGER :: astat
     COMPLEX(KIND=dp), ALLOCATABLE :: xC(:), bC(:)
     COMPLEX(KIND=dp), ALLOCATABLE :: workC(:,:)
-    EXTERNAL :: AddrFunc    
 
+    !------------------------------------------------
+    ! Parallel asyncronous timestepping
+    INTEGER :: nsent, nloops, nvar
+    REAL(KIND=dp), ALLOCATABLE :: b0(:),dx(:),r(:)
+    LOGICAL :: Finish = .FALSE., ResidualMode 
+    TYPE(Variable_t), POINTER :: Var
+    REAL(KIND=dp), POINTER :: prevx(:)
+    REAL(KIND=dp) :: dt
+    TYPE(Matrix_t) :: Mass
+    !------------------------------------------------
+    
+    EXTERNAL :: AddrFunc    
+    
     INTERFACE
       SUBROUTINE VankaCreate(A,Solver)
         USE Types
@@ -923,58 +939,80 @@ CONTAINS
     ELSE
       CALL Info('IterSolver','Calling real valued iterative solver',Level=32)
 
-      IF( ListGetLogical(Params,'Time Parallel Aperiodic', GotIt ) ) THEN
-        BLOCK
-          INTEGER :: nsent, nloops, k
-          REAL(KIND=dp) :: xcum(          
-          REAL(KIND=dp), DIMENSION(:), TARGET CONTIG :: x0,b0
-          LOGICAL :: FirstTime, LastTime
+      IF( ListGetLogical(Params,'Parallel Async', GotIt ) ) THEN
+        nsent = ListGetInteger( Params,'Time Parallel Sent Interval',GotIt)
+        nloops =  HUTI_MAXIT / nsent
+        HUTI_MAXIT = nsent
 
-          FirstTime = ( ParEnv % MyPe == 0 ) 
-          LastTime = ( ParEnv % MyPe == ParEnv % PEs-1 )
-          
-          nsent = ListGetInteger( Params,'Time Parallel Sent Interval',GotIt)
-          nloops =  HUTI_MAXITER / nsent
-          HUTI_MAXITER = nsent
+        ResidualMode = .TRUE.
 
-          ALLOCATE(xcum(SIZE(x)),bcum(SIZE(b)))
-          bcum = b
-          xcum = 0.0_dp
-          prevx0 = 0.0_dp
+        ! The original r.h.s + vector for residual computation 
+        IF( ResidualMode .OR. ParEnv % PEs > 1 ) THEN
+          ALLOCATE( b0(n), r(n) )
+          b0 = b
+        END IF
 
+        IF( ResidualMode ) THEN
+          ALLOCATE(dx(n))
+        END IF
+
+        ! Remove the original implicit euler part from the r.h.s.
+        IF( ParEnv % PEs > 1 ) THEN
           prevx => Solver % Variable % PrevValues(:,1)
-          
-          pValues => A % Values 
-          A % Values => A % MassValues        
-          CALL MatrixVectorMultiply( A, prevx, r0 )            
-          r0 = r0 / dt
-          b0 = b0 - r0 
-          A % Values => TmpValues            
+          nvar = SIZE( Solver % Variable % PrevValues(:,1) )
 
-          dx = x
-          DO k=1,nloops
+          IF( nvar == n ) THEN
+            Mass = A
+          ELSE
+            Mass = Solver % Matrix
+          END IF
+          Mass % Values => Mass % MassValues
+
+          r = 0.0_dp
+          CALL CRS_MatrixVectorMultiply( Mass, prevx, r )            
+          !CALL mvProc( Mass, prevx, r )            
+
+          Var => VariableGet( Solver % Mesh % Variables,'timestep size',GotIt)
+          dt = Var % Values(1)
+          r = r / dt
+
+          b0(1:nvar) = b0(1:nvar) - r(1:nvar)
+        END IF
+
+        DO k=1,nloops
+          IF( ResidualMode .AND. k>1) THEN
+            dx = 0.0_dp
             CALL IterCall( iterProc, dx, b, ipar, dpar, work, &
                 mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
             x = x + dx
-            
-            CALL CommunicateAperiodicSolution(n,xcum,prevx)
-                        
-            ! get solution
-            ! b = b - A*x0 - (M/dt)*dx_{i-1}
-            
-            CALL MatrixVectorMultiply( A, x, r)
+          ELSE
+            CALL IterCall( iterProc, x, b, ipar, dpar, work, &
+                mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
+          END IF
+
+          CALL CommunicateAperiodicSolution(n,x,prevx,Finish)              
+          IF( Finish ) EXIT
+
+          IF( ResidualMode .OR. ParEnv % PEs > 1 ) b = b0 
+
+          ! Update r.h.s. if we continue
+          ! b := b - A*x0 
+          IF( ResidualMode ) THEN
+            CALL CRS_MatrixVectorMultiply( A, x, r)
+            !CALL MvProc( A, x, r)
             b = b0 - r
-            
-            pValues => A % Values 
-            A % Values => A % MassValues
-            
-            CALL MatrixVectorMultiply( A, prevx, r)            
+          END IF
+
+          ! b := b + (M/dt)*dx_{i-1}            
+          IF( ParEnv % PEs > 1 ) THEN              
+            r = 0.0_dp
+            CALL CRS_MatrixVectorMultiply( Mass, prevx, r)            
+            !CALL MvProc( Mass, prevx, r)            
             r = r / dt
             b = b + r  
-            A % Values => TmpValues                                    
-          END DO
-                               
-        END BLOCK
+          END IF
+
+        END DO
       ELSE     
         CALL IterCall( iterProc, x, b, ipar, dpar, work, &
             mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
@@ -1020,25 +1058,54 @@ CONTAINS
 
   CONTAINS
 
-
     
-
-    
-     SUBROUTINE CommunicateAperiodicSolution(n,x,prevx)
-       REAL(KIND=dp), POINTER :: x(:),prevx(:,:)
+     SUBROUTINE CommunicateAperiodicSolution(n,x,prevx,Finish)
+       REAL(KIND=dp) :: x(:), prevx(:)
        INTEGER :: n
+       LOGICAL :: Finish
        
        INTEGER :: toproc, fromproc
        INTEGER :: mpistat(MPI_STATUS_SIZE), ierr
        REAL(KIND=dp), ALLOCATABLE :: tovals(:), fromvals(:)
+       INTEGER :: PrevStat(4), MyStat(4)
        INTEGER :: rank, size, Nslices
        INTEGER :: mpitag
        INTEGER, SAVE :: VisitedTimes = 0
 
+       IF( ParEnv % PEs == 1 ) THEN
+         Finish = ( HUTI_INFO == HUTI_CONVERGENCE ) 
+         RETURN
+       END IF
+            
+       IF( VisitedTimes == 0 ) THEN
+         PrevStat = 0
+         MyStat = 0
+
+         ! 1 - Current 1st step 
+         ! 2 - Current last step
+         ! 3 - Linear system converged
+         ! 4 - Nonlinear system converged
+
+         IF( ParEnv % MyPe == 0 ) THEN
+           MyStat(1) = 1
+         END IF
+         IF( ParEnv % MyPe == ParEnv % PEs-1) THEN
+           MyStat(2) = 1         
+         END IF
+       END IF
+
+       Finish = .FALSE.
        VisitedTimes = VisitedTimes + 1
 
-       CALL Info(Caller,'Communicating data between time segments!',Level=5)
-       
+       CALL Info('IterSolve','Communicating data between time segments!',Level=5)
+
+       IF ( HUTI_INFO == HUTI_CONVERGENCE ) THEN
+         MyStat(3) = 1
+       ELSE
+         MyStat(3) = 0
+       END IF
+
+
        ! Sent data forward in time.
        ! For multislice model the offset to next/previous partition is bigger. 
        Nslices = ListGetInteger( CurrentModel % Simulation,'Number of Slices',Found )
@@ -1054,20 +1121,60 @@ CONTAINS
        tovals = x         
        CALL CheckBuffer( 2*n+n*MPI_BSEND_OVERHEAD )
 
-       IF(.NOT. LastTime ) THEN
+       ! If the current timestep is the 1st one and has converged
+       ! then the 2nd timestep will become the 1st one and the last timestep
+       ! will become the 2nd last. 
+
+       ! timstep "n" sends to "n+1" (i.e. N sends to 1)
+       CALL MPI_BSEND( MyStat, 4, MPI_INTEGER, &
+           toproc, 2006, MPI_COMM_WORLD, ierr )
+       CALL MPI_RECV( PrevStat, 4, MPI_INTEGER, &
+           fromproc, 2006, MPI_COMM_WORLD, mpistat, ierr )
+              
+       ! timestep 1 sent to N. 
+       IF( MyStat(1) == 1 ) THEN
+         CALL MPI_BSEND( MyStat, 4, MPI_INTEGER, &
+             fromproc, 2007, MPI_COMM_WORLD, ierr )
+         ! If 1st has converged, make it the last, and still have it converged. 
+         IF( MyStat(1)==1 .AND. MyStat(3)==1 ) THEN
+           CALL Info('IterSolve','Partition has converged: '//TRIM(I2S(ParEnv % MyPe)))
+           MyStat(2) = 1
+           MyStat(1) = 0
+           CALL ListAddInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv',n)
+           Finish = .TRUE.           
+           RETURN
+         END IF         
+       ELSE IF( MyStat(2) == 1 ) THEN         
+         CALL MPI_RECV( PrevStat, 4, MPI_INTEGER, &
+             toproc, 2007, MPI_COMM_WORLD, mpistat, ierr )
+         ! If 1st has converged, make the 2nd last the new last
+         IF( PrevStat(1)==1 .AND. PrevStat(3)==1 ) THEN
+           CALL Info('IterSolve','Partition is the new 2nd last one: '//TRIM(I2S(ParEnv % MyPe)))
+           MyStat(2) = 0
+         END IF
+       ELSE
+         ! If the one to the last has converged, this is the new 1st timestep.
+         IF( PrevStat(1)==1 .AND. PrevStat(3)==1 ) THEN
+           CALL Info('IterSolve','Partition is the new 1st timestep: '//TRIM(I2S(ParEnv % MyPe)))
+           MyStat(1) = 1
+         END IF         
+       END IF
+        
+       ! Sent except if you're the last one
+       IF( MyStat(2) == 0 ) THEN
          CALL MPI_BSEND( tovals, n, MPI_DOUBLE_PRECISION, &
              toproc, 2005, MPI_COMM_WORLD, ierr )
        END IF
-       IF(.NOT. FirstTime ) THEN
+       ! Recieve except you're the 1st one
+       IF( MyStat(1) == 0 ) THEN
          CALL MPI_RECV( fromvals, n, MPI_DOUBLE_PRECISION, &
              fromproc, 2005, MPI_COMM_WORLD, mpistat, ierr )
+         prevx = fromvals 
        END IF
          
-       prevx(:,1) = fromvals 
-
        DEALLOCATE( tovals, fromvals ) 
 
-     END SUBROUTINE CommunicateCyclicSolution
+     END SUBROUTINE CommunicateAperiodicSolution
    
 
     

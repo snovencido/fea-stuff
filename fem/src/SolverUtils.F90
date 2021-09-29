@@ -9593,7 +9593,7 @@ END FUNCTION SearchNodeL
 !------------------------------------------------------------------------------
      CHARACTER(LEN=MAX_NAME_LEN) :: Method
      LOGICAL :: GotIt
-     INTEGER :: i, Order,ndofs
+     INTEGER :: i, n, Order,ndofs
      REAL(KIND=dp), POINTER CONTIG :: SaveValues(:)
      TYPE(Matrix_t), POINTER :: A
      TYPE(Variable_t), POINTER :: Var
@@ -9751,7 +9751,7 @@ END FUNCTION SearchNodeL
      ! Advance also the exported variables if they happen to be time-dependent
      ! They only have normal prevvalues, when writing this always 2. 
      BLOCK
-       INTEGER :: VarNo,n
+       INTEGER :: VarNo
        CHARACTER(LEN=MAX_NAME_LEN) :: str, var_name
        LOGICAL :: Found
        
@@ -9783,6 +9783,27 @@ END FUNCTION SearchNodeL
        pSolver => Solver
        CALL StoreCyclicSolution(pSolver)
      END IF     
+
+     n = ListGetInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv')
+     IF( n > 0 ) THEN
+       BLOCK 
+         INTEGER :: Nslices, fromproc
+         REAL(KIND=dp), ALLOCATABLE :: fromvals(:)
+         INTEGER :: mpistat(MPI_STATUS_SIZE), ierr
+        
+         ALLOCATE( fromvals(n) )
+         Nslices = ListGetInteger( CurrentModel % Simulation,'Number of Slices',GotIt )
+         IF(.NOT. GotIt) Nslices = 1
+         fromproc = MODULO( ParEnv % MyPe - Nslices, ParEnv % PEs )
+
+         CALL MPI_RECV( fromvals, n, MPI_DOUBLE_PRECISION, &
+             fromproc, 2005, MPI_COMM_WORLD, mpistat, ierr )         
+         n = SIZE( Var % PrevValues(:,1) )
+         Var % PrevValues(1:n,1) = fromvals(1:n) 
+         CALL ListAddInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv',0)       
+       END BLOCK
+     END IF
+
      
 !------------------------------------------------------------------------------
   END SUBROUTINE InitializeTimestep
