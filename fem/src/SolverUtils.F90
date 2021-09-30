@@ -9784,7 +9784,7 @@ END FUNCTION SearchNodeL
        CALL StoreCyclicSolution(pSolver)
      END IF     
 
-     n = ListGetInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv')
+     n = ListGetInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv',GotIt)
      IF( n > 0 ) THEN
        BLOCK 
          INTEGER :: Nslices, fromproc
@@ -21989,7 +21989,11 @@ CONTAINS
      v => VariableGet( Solver % Mesh % Variables, 'coupled iter' )     
      IF( NINT(v % Values(1)) > 1 ) RETURN
 
-     Ncycle = ListGetInteger( Model % Simulation,'Periodic Timesteps')
+     Ncycle = ListGetInteger( Model % Simulation,'Periodic Timesteps',Found)
+     IF(.NOT. Found) THEN
+       CALL Fatal(Caller,'Storing cyclic solution requires "Periodic Timesteps" be given!')
+     END IF
+     
      Ntimes = ListGetInteger( Model % Simulation,'Number of Times',Found )  
      Nslices = ListGetInteger( Model % Simulation,'Number of Slices',Found )
 

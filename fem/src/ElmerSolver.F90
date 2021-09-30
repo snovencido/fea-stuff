@@ -2308,6 +2308,11 @@ END INTERFACE
        CALL Info('ExecSimulation','Setting one slice for each partition!')
      END IF
 
+     nPeriodic = ListGetInteger( CurrentModel % Simulation,'Periodic Timesteps',GotIt )
+     IF( ParallelTime .AND. nPeriodic == 0 ) THEN
+       CALL Fatal('ExecSimulation','Parallel timestepping requires "Periodic Timesteps"')
+     END IF
+
      IF( nTimes > 1 ) THEN
        DO i=1,SIZE(Timesteps,1)
          IF( MODULO( Timesteps(i), nTimes ) /= 0 ) THEN
@@ -2316,20 +2321,13 @@ END INTERFACE
          Timesteps(i) = Timesteps(i) / nTimes
        END DO
        CALL Info('ExecSimulation','Divided timestep intervals equally for each partition!',Level=4)
-     END IF
 
-
-     
-     nPeriodic = ListGetInteger( CurrentModel % Simulation,'Periodic Timesteps',GotIt )
-     IF( ParallelTime ) THEN
-       IF( nPeriodic <= 0 ) THEN
-         CALL Fatal('ExecSimulation','Parallel timestepping requires "Periodic Timesteps"')
-       END IF
        IF( MODULO( nPeriodic, nTimes ) /= 0 ) THEN
-         CALL Fatal('ExecSimulation','For parallel timestepping "Periodic Timesteps" must be divisible by #np')
+         CALL Fatal('ExecSimulation','For parallel timestepping "Periodic Timesteps" must be divisible by nTimes!')
        END IF
        nPeriodic = nPeriodic / nTimes
      END IF
+
      
      IF( ListGetLogical( CurrentModel % Simulation,'Parallel Slices',GotIt ) ) THEN
        IF( nSlices <= 1 ) THEN
@@ -2487,21 +2485,20 @@ END INTERFACE
              sTime(1) = sTime(1) + (nTimes-1) * dt
            END IF
          ELSE IF( ParallelTime ) THEN
-           timePeriod = nTimes * nPeriodic * dt                        
            IF( cum_Timestep == 1 ) THEN
              sTime(1) = sTime(1) + iTime * nPeriodic * dt
            ELSE IF( MODULO( cum_Timestep, nPeriodic ) == 1 ) THEN
              CALL Info('ExecSimulation','Making jump in time-parallel scheme!')
              sTime(1) = sTime(1) + nPeriodic * (nTimes - 1) * dt
            END IF
-         ELSE IF( nPeriodic > 0 ) THEN
-           timePeriod = nPeriodic * dt           
          END IF
-                  
-         sPeriodic(1) = sTime(1)         
-         DO WHILE(sPeriodic(1) > timePeriod)
-           sPeriodic(1) = sPeriodic(1) - timePeriod 
-         END DO
+
+         IF( nPeriodic > 0 ) THEN
+           timePeriod = nTimes * nPeriodic * dt           
+         END IF
+
+         ! Periodic time always between [0,timePeriod]
+         sPeriodic(1) = MODULO(sTime(1),timePeriod)         
          
          ! Move the old timesteps one step down the ladder
          IF(timestep > 1 .OR. interval > 1) THEN

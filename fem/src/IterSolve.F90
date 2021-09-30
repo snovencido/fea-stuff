@@ -243,6 +243,8 @@ CONTAINS
 !------------------------------------------------------------------------------
     N = A % NumberOfRows
     IF ( PRESENT(ndim) ) n=ndim
+
+PRINT *,'n1:',n
     
     ipar = 0
     dpar = 0.0D0
@@ -937,14 +939,19 @@ CONTAINS
       END DO
       DEALLOCATE(bC,xC)
     ELSE
-      CALL Info('IterSolver','Calling real valued iterative solver',Level=32)
 
-      IF( ListGetLogical(Params,'Parallel Async', GotIt ) ) THEN
-        nsent = ListGetInteger( Params,'Time Parallel Sent Interval',GotIt)
+      IF( ListGetLogical(CurrentModel % Simulation,'Parallel Async', GotIt ) ) THEN
+        CALL Info('IterSolver','Calling real valued iterative solver with breaks',Level=12)
+
+        nsent = ListGetInteger(Params,'Linear System Sync Interval',UnfoundFatal=.TRUE.)
+        CALL Info('IterSolver','Breaking solution for communication every '&
+            //TRIM(I2S(nsent))//' iteration!',Level=6)
+
+        n = HUTI_NDIM
         nloops =  HUTI_MAXIT / nsent
         HUTI_MAXIT = nsent
 
-        ResidualMode = .TRUE.
+        ResidualMode = ListGetLogical(Params,'Linear System Residual Restart',GotIt)
 
         ! The original r.h.s + vector for residual computation 
         IF( ResidualMode .OR. ParEnv % PEs > 1 ) THEN
@@ -956,11 +963,13 @@ CONTAINS
           ALLOCATE(dx(n))
         END IF
 
+        prevx => Solver % Variable % PrevValues(:,1)
+        nvar = SIZE( Solver % Variable % PrevValues(:,1) )
+        PRINT *,'nvar vs. n',nvar,n
+
+        
         ! Remove the original implicit euler part from the r.h.s.
         IF( ParEnv % PEs > 1 ) THEN
-          prevx => Solver % Variable % PrevValues(:,1)
-          nvar = SIZE( Solver % Variable % PrevValues(:,1) )
-
           IF( nvar == n ) THEN
             Mass = A
           ELSE
@@ -980,6 +989,8 @@ CONTAINS
         END IF
 
         DO k=1,nloops
+          CALL Info('IterSolver','Restart loop: '//TRIM(I2S(k)),Level=12)
+          
           IF( ResidualMode .AND. k>1) THEN
             dx = 0.0_dp
             CALL IterCall( iterProc, dx, b, ipar, dpar, work, &
@@ -1005,6 +1016,8 @@ CONTAINS
 
           ! b := b + (M/dt)*dx_{i-1}            
           IF( ParEnv % PEs > 1 ) THEN              
+            PRINT *,'prevx',A % NumberOfRows, SIZE(x), SIZE(r)
+             
             r = 0.0_dp
             CALL CRS_MatrixVectorMultiply( Mass, prevx, r)            
             !CALL MvProc( Mass, prevx, r)            
@@ -1013,7 +1026,10 @@ CONTAINS
           END IF
 
         END DO
+        PRINT *,'Conv After:',k*nsent,k,nsent
+        
       ELSE     
+        CALL Info('IterSolver','Calling real valued iterative solver',Level=12)
         CALL IterCall( iterProc, x, b, ipar, dpar, work, &
             mvProc, pcondProc, pcondrProc, dotProc, normProc, stopcProc )
       END IF
