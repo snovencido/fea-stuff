@@ -1435,6 +1435,147 @@ END BLOCK
     END SUBROUTINE ParallelMergeMatrix
 !-------------------------------------------------------------------------------
 
+
+
+    
+    SUBROUTINE ParallelAsyncSol(Solver,n,x,Mode,FirstStep,Updated)
+      TYPE(Solver_t), POINTER :: Solver
+      INTEGER :: n
+      REAL(KIND=dp) :: x(:)
+      CHARACTER(*) :: Mode
+      LOGICAL, OPTIONAL :: FirstStep, Updated
+
+           
+      TYPE(Variable_t), POINTER :: Var      
+      LOGICAL :: AllocationsDone = .FALSE.
+      REAL(KIND=dp), ALLOCATABLE :: sol(:)
+      INTEGER, ALLOCATABLE :: mycnt(:), cnt(:)
+      INTEGER :: solwin, cntwin
+      
+      SAVE AllocationsDone, sol, cnt, Var, solwin, cntwin, leftcnt
+      
+            
+      IF(.NOT. AllocationsDone ) THEN
+        IF(Mode == 'free' ) THEN
+          CALL Info('ParallelAsyncSol','Nothing to do, window was not created!')
+          RETURN
+        END IF
+        CALL Info('Allocating shared memory solution',Level=10)
+        CALL AllocateAsync()
+        AllocationsDone = .TRUE.
+      END IF
+
+      !Nslices = ListGetInteger( CurrentModel % Simulation,'Number of Slices',GotIt )
+      !IF(.NOT. GotIt) Nslices = 1
+      !fromproc = MODULO( ParEnv % MyPe - Nslices, ParEnv % PEs )
+
+   
+      SELECT CASE (Mode)
+
+      CASE('create')
+        CONTINUE
+        
+      CASE('set')
+        CALL Info('Setting shared memory solution',Level=10)
+
+        leftrank = ParEnv % MyPe - 1
+        IF(rightrank < 0 ) leftrank = ParEnv % PEs-1
+        
+        rightrank = ParEnv % MyPe + 1
+        IF(rightrank > ParEnv % PEs-1 ) rightrank = 0
+
+        timestep = NINT(Var % Values)
+        
+        CALL MPI_SET(rightcnt, 2, MPI_INTEGER, rightrank, 0, 2, MPI_INTEGER, cntwin, ierr) 
+
+        IF(.NOT. LastStep ) THEN
+          CALL MPI_SET(x, n, MPI_DOUBLE, rightrank, 0, n, MPI_DOUBLE, solwin, ierr) 
+        END IF
+
+          
+        IF( timestep < leftcnt(1) ) FirstStep = .TRUE.
+        IF( timestep == leftcnt(1) .AND. ParEnv % MyPe == 0 ) FirstStep = .TRUE.
+
+
+
+        
+        sol = x
+        timestep = NINT(Var % Values)
+        tag = tag + 1
+        cnt(1) = timestep
+        cnt(2) = tag
+        
+      CASE('get')
+        IF(.NOT. PRESENT(FirstStep) ) THEN
+          CALL Fatal('ParallelAsyncSol','We need argument "FirstStep" here!')
+        END IF
+        IF(.NOT. PRESENT(Updated) ) THEN
+          CALL Fatal('ParallelAsyncSol','We need argument "Updated" here!')
+        END IF
+
+        CALL Info('Getting shared memory solution',Level=10)
+
+        leftrank = ParEnv % MyPe - 1
+        IF(rightrank < 0 ) leftrank = ParEnv % PEs-1
+
+        rightrank = ParEnv % MyPe + 1
+        IF(rightrank > ParEnv % PEs-1 ) rightrank = 0
+
+        timestep = NINT(Var % Values)
+
+
+
+        FirstStep = .FALSE.
+        Updated = .FALSE.
+
+        
+
+        CALL MPI_GET(leftcnt, 2, MPI_INTEGER, leftrank, 0, 2, MPI_INTEGER, cntwin, ierr) 
+
+        IF( timestep < leftcnt(1) ) FirstStep = .TRUE.
+        IF( timestep == leftcnt(1) .AND. ParEnv % MyPe == 0 ) FirstStep = .TRUE.
+        
+        IF( FirstStep ) THEN
+          prevtag = 0
+        ELSE IF( prevtag < leftcnt(2) ) THEN
+          CALL MPI_GET(x, n, MPI_DOUBLE, leftrank, 0, 2, MPI_DOUBLE, solwin, ierr) 
+          prevtag = leftcnt(2)
+          Updated = .TRUE.
+        END IF
+        
+      CASE('free')
+        CALL MPI_Win_free(solwin)
+        CALL MPI_Win_free(cntwin)
+        CALL Info('Memory window freed!',Level=10)
+        
+      END SELECT
+            
+
+    CONTAINS
+
+      SUBROUTINE AllocateAsync()
+        INTEGER :: sizeofdouble, sizeofint
+
+        ALLOCATE(cnt(2),leftcnt(2),sol(n))
+        cnt = 0
+        leftcnt = 0
+        sol = 0.0_dp
+
+        Var => VariableGet( CurrentModel % Mesh % Variables,'timestep')
+        cnt(1) = NINT(Var % Values(1))
+               
+        CALL MPI_TYPE_EXTENT(MPI_DOUBLE, sizeofdouble, ierr) 
+        CALL MPI_TYPE_EXTENT(MPI_INT, sizeofint, ierr) 
+        CALL MPI_WIN_CREATE(sol, n*sizeofdouble, sizeofdouble, MPI_INFO_NULL,  & 
+            MPI_COMM_WORLD, solwin, ierr) 
+        CALL MPI_WIN_CREATE(cnt, 1*sizeofint, sizeofint, MPI_INFO_NULL,  & 
+            MPI_COMM_WORLD, solcnt, ierr)              
+      END SUBROUTINE AllocateAsync
+      
+
+    END SUBROUTINE ParallelPrevSolution
+    
+    
     
   END MODULE ParallelUtils
 

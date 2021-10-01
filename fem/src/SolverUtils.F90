@@ -9784,23 +9784,18 @@ END FUNCTION SearchNodeL
        CALL StoreCyclicSolution(pSolver)
      END IF     
 
-     n = ListGetInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv',GotIt)
-     IF( n > 0 ) THEN
+     IF( ListGetLogical( CurrentModel % Simulation,'Parallel Async',GotIt) ) THEN       
        BLOCK 
-         INTEGER :: Nslices, fromproc
-         REAL(KIND=dp), ALLOCATABLE :: fromvals(:)
-         INTEGER :: mpistat(MPI_STATUS_SIZE), ierr
-        
-         ALLOCATE( fromvals(n) )
-         Nslices = ListGetInteger( CurrentModel % Simulation,'Number of Slices',GotIt )
-         IF(.NOT. GotIt) Nslices = 1
-         fromproc = MODULO( ParEnv % MyPe - Nslices, ParEnv % PEs )
-
-         CALL MPI_RECV( fromvals, n, MPI_DOUBLE_PRECISION, &
-             fromproc, 2005, MPI_COMM_WORLD, mpistat, ierr )         
-         n = SIZE( Var % PrevValues(:,1) )
-         Var % PrevValues(1:n,1) = fromvals(1:n) 
-         CALL ListAddInteger( CurrentModel % Simulation,'Lagging Aperiodic Recv',0)       
+         REAL(KIND=dp), ALLOCATABLE :: prevx(:)
+         LOGICAL :: FirstStep, Updated
+         
+         n = SIZE( Var % Values )          
+         ALLOCATE( prevx(n) )
+         
+         CALL ParallelAsyncSol(Solver,n,Var % Values,'set')
+         CALL ParallelAsyncSol(Solver,n,prevx,'get',FirstStep,Updated)
+         IF(Updated) Var % PrevValues(1:n,1) = prevx(1:n)
+         DEALLOCATE( prevx )
        END BLOCK
      END IF
 
