@@ -1002,6 +1002,12 @@ PRINT *,'n1:',n
           END IF
 
           CALL CommunicateAperiodicSolution(n,x,prevx,Finish)              
+
+          CALL ParallelAsyncSol(Solver,n,x,'set')
+          CALL ParallelAsyncSol(Solver,n,prevx,'get',FirstStep)
+
+
+
           IF( Finish ) EXIT
 
           IF( ResidualMode .OR. ParEnv % PEs > 1 ) b = b0 
@@ -1074,6 +1080,14 @@ PRINT *,'n1:',n
 
   CONTAINS
 
+    SUBROUTINE AsyncMatrixVectorMultiply()
+
+
+
+      
+      
+
+      
     
      SUBROUTINE CommunicateAperiodicSolution(n,x,prevx,Finish)
        REAL(KIND=dp) :: x(:), prevx(:)
