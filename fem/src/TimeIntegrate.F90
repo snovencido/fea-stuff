@@ -708,8 +708,7 @@ CONTAINS
     !-------------------------------------------------------------
     IF( ASSOCIATED( Matrix % BulkResidual ) ) THEN
       ! Ax-f from previous iteration
-      PrevResidual => Matrix % BulkResidual
-
+      PrevResidual => Matrix % BulkResidual      
       IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
         MassL => Matrix % MassValuesLumped
         !$omp parallel do private(j,ui)
@@ -737,7 +736,6 @@ CONTAINS
         Stiff = Beta * Stiff + (1.0d0/dt) * Mass
       END IF
     ELSE
-
       IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
         MassL => Matrix % MassValuesLumped
         !$omp parallel do private(j,uj,mu)
@@ -801,6 +799,9 @@ CONTAINS
     Mass => Matrix % MassValues
     IF( Matrix % Lumped ) THEN
       MassL => Matrix % MassValuesLumped
+      IF(.NOT. ASSOCIATED(MassL) ) THEN
+        CALL Fatal('BDF_CRS','Lumped mass matrix does not exist!')
+      END IF
     END IF
 
     a = 0.0_dp
@@ -890,6 +891,9 @@ CONTAINS
      Mass => Matrix % MassValues
      IF( Matrix % Lumped ) THEN
        MassL => Matrix % MassValuesLumped
+       IF(.NOT. ASSOCIATED(MassL) ) THEN
+         CALL Fatal('VBDF_CRS','Lumped mass matrix does not exist!')
+       END IF
      END IF
           
      a = 0.0_dp
@@ -975,15 +979,15 @@ CONTAINS
      fsBeta   = ListGetConstReal( Solver % Values, 'fsBeta')
 
      SELECT CASE( INT(fsstep) )     
-       CASE(1)
-        MassCoeff = fsAlpha * fsTheta
-        ForceCoeff = fsBeta * fsTheta 
-       CASE(2)
-        MassCoeff = fsBeta * fsdTheta
-        ForceCoeff = fsAlpha * fsdTheta
-       CASE(3)
-        MassCoeff = fsAlpha * fsTheta
-        ForceCoeff = fsBeta * fsTheta
+     CASE(1)
+       MassCoeff = fsAlpha * fsTheta
+       ForceCoeff = fsBeta * fsTheta 
+     CASE(2)
+       MassCoeff = fsBeta * fsdTheta
+       ForceCoeff = fsAlpha * fsdTheta
+     CASE(3)
+       MassCoeff = fsAlpha * fsTheta
+       ForceCoeff = fsBeta * fsTheta
      END SELECT
 
      n = Matrix % NumberOfRows
@@ -1030,7 +1034,88 @@ CONTAINS
 !------------------------------------------------------------------------------
 
 
+!------------------------------------------------------------------------------
+!> Apply second order Bossak time integration scheme to CRS matrix equation.
+!------------------------------------------------------------------------------
+   SUBROUTINE Bossak2ndOrder_CRS( dt, Matrix, Force, PrevValues, Alpha )
+!------------------------------------------------------------------------------
 
+    REAL(KIND=dp) :: dt
+    REAL(KIND=dp), TARGET :: Force(:)
+    REAL(KIND=dp), POINTER :: PrevValues(:,:)
+    REAL(KIND=dp) :: Alpha
+    TYPE(Matrix_t), POINTER :: Matrix
+!------------------------------------------------------------------------------
+    INTEGER :: n,i,j,k
+    REAL(KIND=dp) :: s, Gamma, Beta, mx, mv, ma, dx, dv, da, ms, ds
+    REAL(KIND=dp), POINTER :: x(:),v(:),a(:)
+    REAL(KIND=dp), POINTER :: Mass(:), Damp(:), Stiff(:)
+    INTEGER, POINTER :: Cols(:), Rows(:)
+!------------------------------------------------------------------------------
+     
+    ! pointer to 0th, 1st and 2nd derivative of solutions      
+    x => PrevValues(:,3)
+    v => PrevValues(:,4)
+    a => PrevValues(:,5)
+                  
+    n = Matrix % NumberOfRows
+    Rows   => Matrix % Rows
+    Cols   => Matrix % Cols
+    Stiff => Matrix % Values
+    Damp => Matrix % DampValues
+    Mass => Matrix % MassValues
+
+    Gamma = 0.5d0 - Alpha
+    Beta = (1.0d0 - Alpha)**2 / 4.0d0
+
+    ! multipliers involving mass matrix contributions to r.h.s.
+    mx = (1.0d0 - Alpha) / (Beta*dt**2)
+    mv = (1.0d0 - Alpha) / (Beta*dt)
+    ma = - (1.0d0 - Alpha) * (1.0d0 - 1.0d0 / (2.0d0*Beta)) + Alpha 
+    
+    ! multipliers involving damping matrix contributions to r.h.s.
+    dx = ( Gamma / (Beta*dt) ) 
+    dv = ( Gamma/Beta - 1.0d0)
+    da = -((1.0d0 - Gamma) + Gamma * (1.0d0 - 1.0d0 / (2.0d0*Beta))) * dt
+
+    ! multipliers of mass and damping matrix contributing to the final stiffness matrix 
+    ms =  ( (1.0d0 - Alpha) / (Beta*dt**2) )
+    ds =  (Gamma / (Beta*dt))
+
+    IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
+      Mass => Matrix % MassValuesLumped
+      DO i=1,n      
+        s = Mass(i) * ( mx * x(i) + mv * v(i) + ma * a(i) )
+        Force(i) = Force(i) + s 
+        j = Matrix % Diag(i) 
+        Stiff(j) = Stiff(j) + ms * Mass(i)
+      END DO
+    ELSE IF( ASSOCIATED( Mass ) ) THEN
+      DO i=1,n      
+        s = 0.0_dp        
+        DO j=Rows(i),Rows(i+1)-1         
+          k = Cols(j)         
+          s = s + Mass(j) * ( mx * x(k) + mv * v(k) + ma * a(k) )
+        END DO        
+        Force(i) = Force(i) + s 
+      END DO
+      Stiff = Stiff + ms * Mass 
+    END IF
+
+    IF( ASSOCIATED( Damp ) ) THEN
+      DO i=1,n      
+        s = 0.0_dp      
+        DO j=Rows(i),Rows(i+1)-1         
+          k = Cols(j)         
+          s = s + Damp(j) * ( dx * x(k) + dv * v(k) + da * a(k) )
+        END DO        
+        Force(i) = Force(i) + s 
+      END DO         
+      Stiff = Stiff + ds * Damp
+    END IF
+      
+  END SUBROUTINE Bossak2ndOrder_CRS
+!------------------------------------------------------------------------------
 
 !------------------------------------------------------------------------------
 END MODULE TimeIntegrate

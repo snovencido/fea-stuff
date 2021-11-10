@@ -2748,17 +2748,8 @@ CONTAINS
 !------------------------------------------------------------------------------
    TYPE(Solver_t), OPTIONAL, TARGET :: USolver
 !------------------------------------------------------------------------------
-   CHARACTER(LEN=MAX_NAME_LEN) :: Method
    TYPE(Solver_t), POINTER :: Solver
-   INTEGER :: i,j,k,l,n,Order
-   REAL(KIND=dp), POINTER :: SaveValues(:) => NULL()
-   REAL(KIND=dp) :: FORCE(1), Dts(16)
-   LOGICAL :: ConstantDt, Found, HasMass, HasFCT
-   TYPE(Variable_t), POINTER :: DtVar
-   SAVE STIFF, MASS, X
-   REAL(KIND=dp), ALLOCATABLE :: STIFF(:,:),MASS(:,:), X(:,:)
-
-   !$OMP THREADPRIVATE(SaveValues)
+   LOGICAL :: Found 
 
    IF ( PRESENT(USolver) ) THEN
      Solver => Usolver
@@ -2766,113 +2757,20 @@ CONTAINS
      Solver => CurrentModel % solver
    END IF
 
-   Order = MAX( MIN( Solver % DoneTime, Solver % Order ), 1)   
-   HasMass = ASSOCIATED( Solver % Matrix % MassValues )
+   ! Order = MAX( MIN( Solver % DoneTime, Solver % Order ), 1)   
 
-   HasFCT = ListGetLogical( Solver % Values,'Linear System FCT', Found )
-
-   IF( HasFCT ) THEN
-     IF( .NOT. HasMass ) THEN
+   IF( ListGetLogical( Solver % Values,'Linear System FCT', Found ) ) THEN
+     IF(.NOT. ASSOCIATED( Solver % Matrix % MassValues ) ) THEN
        CALL Fatal('Default1stOrderTimeGlobal','FCT only makes sense if there is a mass matrix!')
-     ELSE
-       IF(.NOT. ASSOCIATED( Solver % Matrix % MassValuesLumped ) ) THEN
-         CALL Fatal('Default1stOrderTimeGlobal','FCT requires a lumped mass matrix!')
-       END IF
-       HasMass = .FALSE.
+     END IF
+     IF(.NOT. ASSOCIATED( Solver % Matrix % MassValuesLumped ) ) THEN
+       CALL Fatal('Default1stOrderTimeGlobal','FCT requires a lumped mass matrix!')
      END IF
    END IF
-
-   ! This is now the default global time integration routine but the old hack may still be called
+   
+   ! This is now the default global time integration routine 
    !---------------------------------------------------------------------------------------------
-   IF( .NOT. ListGetLogical( Solver % Values,'Old Global Time Integration',Found ) ) THEN
-     CALL Add1stOrderTime_CRS( Solver % Matrix, Solver % Matrix % rhs, &
-         Solver % dt, Solver )
-     RETURN
-   END IF
-
-
-   ! The rest of the code in this subroutine is obsolete
-   IF ( .NOT.ASSOCIATED(Solver % Variable % Values, SaveValues) ) THEN
-     IF ( ALLOCATED(STIFF) ) DEALLOCATE( STIFF,MASS,X )
-     n = 0
-     DO i=1,Solver % Matrix % NumberOfRows
-       n = MAX( n,Solver % Matrix % Rows(i+1)-Solver % Matrix % Rows(i) )
-     END DO
-     k = SIZE(Solver % Variable % PrevValues,2)
-     ALLOCATE( STIFF(1,n),MASS(1,n),X(n,k) )     
-     SaveValues => Solver % Variable % Values
-   END IF
-   
-   STIFF = 0.0_dp
-   MASS = 0.0_dp
-   X = 0.0_dp
-
-   Method = ListGetString( Solver % Values, 'Timestepping Method', Found )
-   IF ( Method == 'bdf' ) THEN
-     Dts(1) = Solver % Dt
-     ConstantDt = .TRUE.
-     IF(Order > 1) THEN
-       DtVar => VariableGet( Solver % Mesh % Variables, 'Timestep size' )
-       DO i=2,Order
-         Dts(i) = DtVar % PrevValues(1,i-1)
-         IF(ABS(Dts(i)-Dts(1)) > 1.0d-6 * Dts(1)) ConstantDt = .FALSE.
-       END DO
-     END IF
-   END IF
-   
-   DO i=1,Solver % Matrix % NumberOFRows
-     n = 0
-     k = 0
-
-     DO j=Solver % Matrix % Rows(i),Solver % Matrix % Rows(i+1)-1
-       n = n+1
-       STIFF(1,n) = Solver % Matrix % Values(j)
-       IF( HasMass ) THEN
-         MASS(1,n) = Solver % Matrix % MassValues(j)
-       ELSE IF( HasFCT ) THEN
-         IF( j == Solver % Matrix % Diag(i) ) k = n
-       END IF         
-       X(n,:) = Solver % Variable % PrevValues(Solver % Matrix % Cols(j),:)
-     END DO
-
-     ! Use lumped mass in lower order fct
-     IF( HasFCT ) THEN
-       IF( k == 0 ) THEN
-         CALL Fatal('Default1stOrderTimeGlobal','Could not find diagonal entry for fct')
-       ELSE
-         MASS(1,k) = Solver % Matrix % MassValuesLumped(i)
-       END IF
-     END IF
-
-     FORCE(1) = Solver % Matrix % RHS(i)
-     Solver % Matrix % Force(i,1) = FORCE(1)
-
-     SELECT CASE( Method )
-     CASE( 'fs' )
-       CALL FractionalStep( n, Solver % dt, MASS, STIFF, FORCE, &
-           X(:,1), Solver % Beta, Solver )
-       
-     CASE('bdf')       
-       IF(ConstantDt) THEN
-         CALL BDFLocal( n, Solver % dt, MASS, STIFF, FORCE, X, Order )
-       ELSE
-         CALL VBDFLocal(n, Dts, MASS, STIFF, FORCE, X, Order )
-       END IF
-       
-     CASE DEFAULT
-       CALL NewmarkBeta( n, Solver % dt, MASS, STIFF, FORCE, &
-           X(:,1), Solver % Beta )
-     END SELECT
-
-     IF( HasFCT ) MASS(1,k) = 0.0_dp
-
-     n = 0
-     DO j=Solver % Matrix % Rows(i),Solver % Matrix % Rows(i+1)-1
-       n=n+1
-       Solver % Matrix % Values(j) = STIFF(1,n)
-     END DO
-     Solver % Matrix % RHS(i) = FORCE(1)
-   END DO
+   CALL Add1stOrderTime_CRS( Solver % Matrix, Solver % Matrix % rhs, Solver % dt, Solver )
 
 !----------------------------------------------------------------------------
   END SUBROUTINE Default1stOrderTimeGlobal
@@ -2884,12 +2782,6 @@ CONTAINS
    TYPE(Solver_t), OPTIONAL, TARGET :: USolver
 !------------------------------------------------------------------------------
    TYPE(Solver_t), POINTER :: Solver
-   INTEGER :: i,j,k,l,n
-   REAL(KIND=dp), POINTER :: SaveValues(:) => NULL()
-   REAL(KIND=dp) :: FORCE(1)
-   LOGICAL :: Found, HasDamping, HasMass
-   REAL(KIND=dp), ALLOCATABLE, SAVE :: STIFF(:,:),MASS(:,:), DAMP(:,:), X(:,:)
-   !OMP THREADPRIVATE(SaveValues)
 
    IF ( PRESENT(USolver) ) THEN
      Solver => Usolver
@@ -2897,47 +2789,9 @@ CONTAINS
      Solver => CurrentModel % solver
    END IF
 
-   IF ( .NOT.ASSOCIATED(Solver % Variable % Values, SaveValues) ) THEN
-      IF ( ALLOCATED(STIFF) ) DEALLOCATE( STIFF,MASS,DAMP,X )
-      n = 0
-      DO i=1,Solver % Matrix % NumberOfRows
-        n = MAX( n,Solver % Matrix % Rows(i+1)-Solver % Matrix % Rows(i) )
-      END DO
-      k = SIZE(Solver % Variable % PrevValues,2)
-      ALLOCATE( STIFF(1,n),MASS(1,n),DAMP(1,n),X(n,k) )
-      SaveValues => Solver % Variable % Values
+   CALL Bossak2ndOrder_CRS( Solver % dt, Solver % Matrix, Solver % Matrix % Rhs, &
+       Solver % Variable % PrevValues, Solver % Alpha )
 
-      STIFF = 0.0_dp
-      MASS = 0.0_dp
-      DAMP = 0.0_dp
-      X = 0.0_dp
-    END IF
-
-    HasDamping = ASSOCIATED(Solver % Matrix % DampValues )
-    HasMass = ASSOCIATED(Solver % Matrix % MassValues )
-
-    DO i=1,Solver % Matrix % NumberOFRows
-      n = 0
-      DO j=Solver % Matrix % Rows(i),Solver % Matrix % Rows(i+1)-1
-        n=n+1
-        IF( HasMass ) MASS(1,n) = Solver % Matrix % MassValues(j)
-        IF( HasDamping ) DAMP(1,n) = Solver % Matrix % DampValues(j)
-        STIFF(1,n) = Solver % Matrix % Values(j)
-        X(n,:) = Solver % Variable % PrevValues(Solver % Matrix % Cols(j),:)
-      END DO
-      FORCE(1) = Solver % Matrix % RHS(i)
-      Solver % Matrix % Force(i,1) = FORCE(1)
-      
-      CALL Bossak2ndOrder( n, Solver % dt, MASS, DAMP, STIFF, &
-          FORCE, X(1:n,3), X(1:n,4), X(1:n,5), Solver % Alpha )
-      
-      n = 0
-      DO j=Solver % Matrix % Rows(i),Solver % Matrix % Rows(i+1)-1
-        n=n+1
-        Solver % Matrix % Values(j) = STIFF(1,n)
-      END DO
-      Solver % Matrix % RHS(i) = FORCE(1)
-    END DO
 !----------------------------------------------------------------------------
   END SUBROUTINE Default2ndOrderTimeGlobal
 !----------------------------------------------------------------------------
