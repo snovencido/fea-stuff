@@ -13896,7 +13896,7 @@ END FUNCTION SearchNodeL
     LOGICAL :: Relax,GotIt,Stat,ScaleSystem, EigenAnalysis, HarmonicAnalysis,&
                BackRotation, ApplyRowEquilibration, ApplyLimiter, Parallel, &
                SkipZeroRhs, ComplexSystem, ComputeChangeScaled, ConstraintModesAnalysis, &
-               RecursiveAnalysis, CalcLoads
+               RecursiveAnalysis, CalcLoads, Explicit
     INTEGER :: n,i,j,k,l,ii,m,DOF,istat,this,mn
     CHARACTER(LEN=MAX_NAME_LEN) :: Method, Prec, ProcName, SaveSlot
     INTEGER(KIND=AddrInt) :: Proc
@@ -13910,7 +13910,8 @@ END FUNCTION SearchNodeL
     TYPE(Variable_t), POINTER :: IterV
     LOGICAL :: NormalizeToUnity, AndersonAcc, AndersonScaled, NoSolve, Found
     REAL(KIND=dp), POINTER :: pv(:)
-
+    CHARACTER(*), PARAMETER :: Caller = 'SolveLinearSystem'
+    
     TARGET b, x 
     
     INTERFACE 
@@ -13951,20 +13952,20 @@ END FUNCTION SearchNodeL
     IF ( .NOT. GotIt  ) ScaleSystem = .TRUE.
     
     IF( ListGetLogical( Params,'Linear System Skip Complex',GotIt ) ) THEN
-      CALL Info('SolveLinearSystem','This time skipping complex treatment',Level=20)
+      CALL Info(Caller,'This time skipping complex treatment',Level=20)
       A % COMPLEX = .FALSE.
       ComplexSystem = .FALSE.
     END IF
 
     IF( ListGetLogical( Params,'Linear System Skip Scaling',GotIt ) ) THEN     
-      CALL Info('SolveLinearSystem','This time skipping scaling',Level=20)
+      CALL Info(Caller,'This time skipping scaling',Level=20)
       ScaleSystem = .FALSE.
     END IF
    
     IF( A % COMPLEX ) THEN
-      CALL Info('SolveLinearSystem','Assuming complex valued linear system',Level=6)
+      CALL Info(Caller,'Assuming complex valued linear system',Level=6)
     ELSE
-      CALL Info('SolveLinearSystem','Assuming real valued linear system',Level=8)
+      CALL Info(Caller,'Assuming real valued linear system',Level=8)
     END IF
 
     Parallel = ( ParEnv % Pes>1 ) 
@@ -13979,18 +13980,18 @@ END FUNCTION SearchNodeL
 !------------------------------------------------------------------------------
     IF ( Parallel  ) THEN
       IF( .NOT. ASSOCIATED(A % ParMatrix) ) THEN
-        CALL Info('SolveLinearSystem','Creating parallel matrix stuctures',Level=8)
+        CALL Info(Caller,'Creating parallel matrix stuctures',Level=8)
         CALL ParallelInitMatrix( Solver, A )
       ELSE
-        CALL Info('SolveLinearSystem','Using previously created parallel matrix stuctures!',Level=15)
+        CALL Info(Caller,'Using previously created parallel matrix stuctures!',Level=15)
       END IF      
       Parallel = ASSOCIATED(A % ParMatrix)       
     END IF
 
     IF( Parallel ) THEN
-      CALL Info('SolveLinearSystem','Assuming parallel linear system',Level=8)
+      CALL Info(Caller,'Assuming parallel linear system',Level=8)
     ELSE
-      CALL Info('SolveLinearSystem','Assuming serial linear system',Level=8)
+      CALL Info(Caller,'Assuming serial linear system',Level=8)
     END IF  
         
     IF ( ListGetLogical( Solver % Values, 'Linear System Save',GotIt )) THEN
@@ -14006,29 +14007,38 @@ END FUNCTION SearchNodeL
     IF (.NOT.GotIt) BackRotation=.TRUE.
     BackRotation = BackRotation .AND. ASSOCIATED(Solver % Variable % Perm)
 
-    IF ( Solver % Matrix % Lumped .AND. Solver % TimeOrder == 1 ) THEN
-       Method = ListGetString( Params, 'Timestepping Method', GotIt)
-       IF (  Method == 'runge-kutta' .OR. Method == 'explicit euler' ) THEN
-         ALLOCATE(Diag(n), TempRHS(n))
 
-         TempRHS= b(1:n)
-         Diag = A % Values(A % Diag)
+    IF ( Solver % Matrix % Lumped ) THEN
+      Method = ListGetString( Params, 'Timestepping Method', GotIt)
 
-         IF( Parallel ) THEN
-           CALL ParallelSumVector(A,Diag)
-           CALL ParallelSumVector(A,TempRHS)
-         END IF
+      Explicit = ( ListGetString( Solver % Values,'Linear System Solver',GotIt ) == 'explicit' )
+      IF( .NOT. Explicit .AND. Solver % TimeOrder == 1 ) THEN
+        Explicit = (  Method == 'runge-kutta' .OR. Method == 'explicit euler' )
+      END IF
 
-         DO i=1,n
-            IF ( ABS(Diag(i)) /= 0._dp ) x(i) = TempRHS(i) / Diag(i)
-         END DO
+      IF( Explicit ) THEN
+        IF( Parallel ) THEN
+          ALLOCATE(Diag(n), TempRHS(n))
 
-         DEALLOCATE(Diag, TempRHS)
+          TempRHS = b(1:n)
+          Diag = A % Values(A % Diag)
 
-         IF (BackRotation) CALL BackRotateNTSystem( x, Solver % Variable % Perm, DOFs )
-         Norm = ComputeNorm(Solver, n, x) 
-         RETURN
-       END IF
+          CALL ParallelSumVector(A,Diag)
+          CALL ParallelSumVector(A,TempRHS)
+
+          WHERE( Diag /= 0._dp )
+            x = TempRhs / Diag
+          END WHERE
+
+          DEALLOCATE(Diag, TempRHS)
+        ELSE
+          x = b(1:n) / A % Values(A % Diag)           
+        END IF
+
+        IF (BackRotation) CALL BackRotateNTSystem( x, Solver % Variable % Perm, DOFs )
+        Norm = ComputeNorm(Solver, n, x) 
+        RETURN
+      END IF
     END IF
     
 !------------------------------------------------------------------------------
@@ -14068,7 +14078,7 @@ END FUNCTION SearchNodeL
     IF ( .NOT. ( RecursiveAnalysis .OR. ApplyLimiter .OR. SkipZeroRhs ) ) THEN
       bnorm = SQRT(ParallelReduction(SUM(b(1:n)**2)))      
       IF ( bnorm <= TINY( bnorm) ) THEN
-        CALL Info('SolveLinearSystem','Solution trivially zero!',Level=5)
+        CALL Info(Caller,'Solution trivially zero!',Level=5)
         x = 0.0d0
 
         ! Increase the nonlinear counter since otherwise some stuff may stagnate
@@ -14173,7 +14183,7 @@ END FUNCTION SearchNodeL
     END IF
       
     IF ( bnorm <= TINY( bnorm) .AND..NOT.SkipZeroRhs) THEN
-      CALL Info('SolveLinearSystem','Solution trivially zero!',Level=5)
+      CALL Info(Caller,'Solution trivially zero!',Level=5)
       x = 0.0d0
 
       ! Increase the nonlinear counter since otherwise some stuff may stagnate
@@ -14257,7 +14267,7 @@ END FUNCTION SearchNodeL
       IF( xn > TINY( xn ) ) THEN
         x(1:n) = x(1:n) * ( bn / xn )
         WRITE( Message,'(A,ES12.3)') 'Linear System Normalizing Factor: ',bn/xn
-        CALL Info('SolveLinearSystem',Message,Level=6) 
+        CALL Info(Caller,Message,Level=6) 
       END IF
       DEALLOCATE( TempVector )
     END IF
@@ -14271,7 +14281,7 @@ END FUNCTION SearchNodeL
     IF (Method=='multigrid' .OR. Method=='iterative' ) THEN
       Prec = ListGetString(Params,'Linear System Preconditioning',GotIt)
       IF( GotIt ) THEN
-        CALL Info('SolveLinearSystem','Linear System Preconditioning: '//TRIM(Prec),Level=8)
+        CALL Info(Caller,'Linear System Preconditioning: '//TRIM(Prec),Level=8)
         IF ( Prec=='vanka' ) CALL VankaCreate(A,Solver)
         IF ( Prec=='circuit' ) CALL CircuitPrecCreate(A,Solver)
       END IF
@@ -14286,7 +14296,7 @@ END FUNCTION SearchNodeL
       
     
     IF ( .NOT. Parallel ) THEN
-      CALL Info('SolveLinearSystem','Serial linear System Solver: '//TRIM(Method),Level=8)
+      CALL Info(Caller,'Serial linear System Solver: '//TRIM(Method),Level=8)
       
       SELECT CASE(Method)
       CASE('multigrid')
@@ -14295,7 +14305,7 @@ END FUNCTION SearchNodeL
       CASE('iterative')
         CALL IterSolver( A, x, b, Solver )
       CASE('feti')
-        CALL Fatal('SolveLinearSystem', &
+        CALL Fatal(Caller, &
             'Feti solver available only in parallel.')
       CASE('block')
         CALL BlockSolveExt( A, x, b, Solver )
@@ -14303,7 +14313,7 @@ END FUNCTION SearchNodeL
         CALL DirectSolver( A, x, b, Solver )        
       END SELECT
     ELSE
-      CALL Info('SolveLinearSystem','Parallel linear System Solver: '//TRIM(Method),Level=8)
+      CALL Info(Caller,'Parallel linear System Solver: '//TRIM(Method),Level=8)
 
       SELECT CASE(Method)
       CASE('multigrid')
@@ -14361,7 +14371,7 @@ END FUNCTION SearchNodeL
       CalcLoads = ListGetLogical( Solver % Values,'Calculate Loads',GotIt )
       IF( .NOT. GotIt ) CalcLoads = .TRUE.
       IF( CalcLoads ) THEN
-        CALL Info('SolveLinearSystem','Calculating nodal loads',Level=6)
+        CALL Info(Caller,'Calculating nodal loads',Level=6)
         CALL CalculateLoads( Solver, Aaid, x, Dofs, .TRUE., NodalLoads ) 
       END IF
     END IF
@@ -14680,28 +14690,30 @@ END FUNCTION SearchNodeL
     IF ( Solver % LinAfterProc /= 0 ) THEN
       CALL Info('SolveSystem','Calling procedure after solving system',Level=7)
       istat = ExecLinSolveProcs( Solver % LinAfterProc, CurrentModel, Solver, &
-              A, b, x, n, DOFs, Norm )
+          A, b, x, n, DOFs, Norm )
     END IF
 
     IF ( Solver % TimeOrder == 2 ) THEN
       CALL Info('SolveSystem','Setting up PrevValues for 2nd order transient equations',Level=12)
-
-      IF ( ASSOCIATED( Solver % Variable % PrevValues ) ) THEN
-        Gamma =  0.5d0 - Solver % Alpha
-        Beta  = (1.0d0 - Solver % Alpha)**2 / 4.0d0
-        DO i=1,n
-          Solver % Variable % PrevValues(i,2) = &
-             (1.0d0/(Beta*Solver % dt**2))* &
-               (x(i)-Solver % Variable % PrevValues(i,3)) -  &
-                  (1.0d0/(Beta*Solver % dt))*Solver % Variable % PrevValues(i,4)+ &
-                        (1.0d0-1.0d0/(2*Beta))*Solver % Variable % PrevValues(i,5)
-
-          Solver % Variable % PrevValues(i,1) = &
-            Solver % Variable % PrevValues(i,4) + &
-               Solver % dt*((1.0d0-Gamma)*Solver % Variable % PrevValues(i,5)+&
-                  Gamma*Solver % Variable % PrevValues(i,2))
-        END DO
-      END IF
+      BLOCK
+        REAL(KIND=dp), POINTER :: PrevValues(:,:)
+        REAL(KIND=dp) :: cx,cv,ca,cd,ce
+        
+        PrevValues => Solver % Variable % PrevValues
+        
+        IF ( ASSOCIATED( PrevValues ) ) THEN
+          Gamma =  0.5d0 - Solver % Alpha
+          Beta  = (1.0d0 - Solver % Alpha)**2 / 4.0d0
+          cx = (1.0d0/(Beta*Solver % dt**2))
+          cv = (1.0d0/(Beta*Solver % dt))
+          ca = (1.0d0-1.0d0/(2*Beta))
+          cd = Solver % dt * (1.0d0-Gamma)
+          ce = Solver % dt * Gamma
+          
+          PrevValues(:,2) = cx*(x(1:n)-PrevValues(:,3)) - cv*PrevValues(:,4) + ca*PrevValues(:,5)            
+          PrevValues(:,1) = PrevValues(:,4) + cd*PrevValues(:,5) + ce * PrevValues(:,2)
+        END IF
+      END BLOCK
     END IF
 
     IF( Timing ) THEN

@@ -609,6 +609,9 @@ CONTAINS
     Cols   => Matrix % Cols
     Stiff => Matrix % Values
     Mass => Matrix % MassValues
+    MassL => Matrix % MassValuesLumped
+
+    IF(.NOT. ( ASSOCIATED(Mass) .OR. ASSOCIATED(MassL) ) ) RETURN
     
     ! For true 2nd order accuracy of Crank-Nicolsen for nonlinear
     ! problems the old matrix and rhs need to be considered.
@@ -617,8 +620,7 @@ CONTAINS
       ! Ax-f from previous iteration
       PrevResidual => Matrix % BulkResidual
 
-      IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
-        MassL => Matrix % MassValuesLumped
+      IF( ASSOCIATED( MassL ) ) THEN
         !$omp parallel do private(j,ui)
         DO i=1,n
           j = Matrix % Diag(i)
@@ -643,8 +645,7 @@ CONTAINS
       END IF
     ELSE
 
-      IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
-        MassL => Matrix % MassValuesLumped
+      IF( ASSOCIATED( MassL ) ) THEN
         !$omp parallel do private(j,uj,mu)
         DO i=1,n
           su = 0.0_dp
@@ -702,6 +703,9 @@ CONTAINS
     Cols   => Matrix % Cols
     Stiff => Matrix % Values
     Mass => Matrix % MassValues
+    MassL => Matrix % MassValuesLumped
+
+    IF(.NOT. ( ASSOCIATED(Mass) .OR. ASSOCIATED(MassL) ) ) RETURN
     
     ! For true 2nd order accuracy of Crank-Nicolsen for nonlinear
     ! problems the old matrix and rhs need to be considered.
@@ -709,8 +713,7 @@ CONTAINS
     IF( ASSOCIATED( Matrix % BulkResidual ) ) THEN
       ! Ax-f from previous iteration
       PrevResidual => Matrix % BulkResidual      
-      IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
-        MassL => Matrix % MassValuesLumped
+      IF( ASSOCIATED( MassL ) ) THEN
         !$omp parallel do private(j,ui)
         DO i=1,n
           j = Matrix % Diag(i)
@@ -736,8 +739,7 @@ CONTAINS
         Stiff = Beta * Stiff + (1.0d0/dt) * Mass
       END IF
     ELSE
-      IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
-        MassL => Matrix % MassValuesLumped
+      IF( ASSOCIATED( MassL ) ) THEN
         !$omp parallel do private(j,uj,mu)
         DO i=1,n
           su = 0.0_dp
@@ -767,7 +769,6 @@ CONTAINS
         Stiff = Beta * Stiff + (1.0d0/dt) * Mass
       END IF
     END IF
-
 
 !------------------------------------------------------------------------------
   END SUBROUTINE NewmarkBeta_CRS
@@ -802,8 +803,10 @@ CONTAINS
       IF(.NOT. ASSOCIATED(MassL) ) THEN
         CALL Fatal('BDF_CRS','Lumped mass matrix does not exist!')
       END IF
+    ELSE IF(.NOT. ASSOCIATED(Mass)) THEN
+      RETURN
     END IF
-
+    
     a = 0.0_dp
     SELECT CASE( Order)
     CASE(1)
@@ -894,6 +897,8 @@ CONTAINS
        IF(.NOT. ASSOCIATED(MassL) ) THEN
          CALL Fatal('VBDF_CRS','Lumped mass matrix does not exist!')
        END IF
+     ELSE IF(.NOT. ASSOCIATED(Mass) ) THEN
+       RETURN
      END IF
           
      a = 0.0_dp
@@ -1071,7 +1076,7 @@ CONTAINS
     ! multipliers involving mass matrix contributions to r.h.s.
     mx = (1.0d0 - Alpha) / (Beta*dt**2)
     mv = (1.0d0 - Alpha) / (Beta*dt)
-    ma = - (1.0d0 - Alpha) * (1.0d0 - 1.0d0 / (2.0d0*Beta)) + Alpha 
+    ma = - ( (1.0d0 - Alpha) * (1.0d0 - 1.0d0 / (2.0d0*Beta)) + Alpha )
     
     ! multipliers involving damping matrix contributions to r.h.s.
     dx = ( Gamma / (Beta*dt) ) 
@@ -1081,7 +1086,7 @@ CONTAINS
     ! multipliers of mass and damping matrix contributing to the final stiffness matrix 
     ms =  ( (1.0d0 - Alpha) / (Beta*dt**2) )
     ds =  (Gamma / (Beta*dt))
-
+    
     IF( ASSOCIATED( Matrix % MassValuesLumped ) ) THEN
       Mass => Matrix % MassValuesLumped
       DO i=1,n      

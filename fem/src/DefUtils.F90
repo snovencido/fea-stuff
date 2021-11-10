@@ -2757,8 +2757,6 @@ CONTAINS
      Solver => CurrentModel % solver
    END IF
 
-   ! Order = MAX( MIN( Solver % DoneTime, Solver % Order ), 1)   
-
    IF( ListGetLogical( Solver % Values,'Linear System FCT', Found ) ) THEN
      IF(.NOT. ASSOCIATED( Solver % Matrix % MassValues ) ) THEN
        CALL Fatal('Default1stOrderTimeGlobal','FCT only makes sense if there is a mass matrix!')
