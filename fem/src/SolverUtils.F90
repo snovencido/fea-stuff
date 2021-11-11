@@ -13875,7 +13875,6 @@ END FUNCTION SearchNodeL
 
 
 
-
 !------------------------------------------------------------------------------
 !> Solves a linear system and also calls the necessary preconditioning routines.
 !------------------------------------------------------------------------------
@@ -14011,8 +14010,8 @@ END FUNCTION SearchNodeL
     IF ( Solver % Matrix % Lumped ) THEN
       Method = ListGetString( Params, 'Timestepping Method', GotIt)
 
-      Explicit = ( ListGetString( Solver % Values,'Linear System Solver',GotIt ) == 'explicit' )
-      IF( .NOT. Explicit .AND. Solver % TimeOrder == 1 ) THEN
+      Explicit = .FALSE.
+      IF( Solver % TimeOrder == 1 ) THEN
         Explicit = (  Method == 'runge-kutta' .OR. Method == 'explicit euler' )
       END IF
 
@@ -14538,6 +14537,103 @@ END FUNCTION SearchNodeL
   END FUNCTION HaveConstraintMatrix
 
   
+
+!------------------------------------------------------------------------------
+!> Solves a linear system and also calls the necessary preconditioning routines.
+!------------------------------------------------------------------------------
+  RECURSIVE SUBROUTINE SolveExplicitSystem( A, b, &
+       x, Norm, DOFs, Solver )
+!------------------------------------------------------------------------------
+    USE EigenSolve
+
+    REAL(KIND=dp) CONTIG :: b(:), x(:)
+    REAL(KIND=dp) :: Norm
+    TYPE(Matrix_t), POINTER :: A
+    INTEGER :: DOFs
+    TYPE(Solver_t), TARGET :: Solver
+!------------------------------------------------------------------------------
+    INTEGER :: n,i,j,k
+    CHARACTER(LEN=MAX_NAME_LEN) :: Method, SaveSlot
+    LOGICAL :: Explicit, Parallel, GotIt
+    REAL(KIND=dp), ALLOCATABLE, TARGET :: TempRHS(:)
+    REAL(KIND=dp), POINTER :: Diag(:)
+    TYPE(ValueList_t), POINTER :: Params
+    CHARACTER(*), PARAMETER :: Caller = 'SolveExplicitSystem'
+    
+    TARGET b, x 
+    
+!------------------------------------------------------------------------------
+
+    Params => Solver % Values
+ 
+!------------------------------------------------------------------------------
+!   Parallel initializations
+!------------------------------------------------------------------------------
+    Parallel = ( ParEnv % Pes>1 ) 
+    IF( Parallel ) THEN
+      IF( Solver % Mesh % SingleMesh ) THEN
+        Parallel = ListGetLogical( CurrentModel % Simulation,'Enforce Parallel', GotIt ) 
+      END IF
+    END IF
+    
+    IF ( Parallel  ) THEN
+      IF( .NOT. ASSOCIATED(A % ParMatrix) ) THEN
+        CALL Info(Caller,'Creating parallel matrix stuctures',Level=8)
+        CALL ParallelInitMatrix( Solver, A )
+      ELSE
+        CALL Info(Caller,'Using previously created parallel matrix stuctures!',Level=15)
+      END IF      
+      Parallel = ASSOCIATED(A % ParMatrix)       
+    END IF
+
+    IF( Parallel ) THEN
+      CALL Info(Caller,'Assuming parallel linear system',Level=8)
+    ELSE
+      CALL Info(Caller,'Assuming serial linear system',Level=8)
+    END IF  
+
+    ! All features are not available for explicit systems.
+    !------------------------------------------------------------------------------------
+    IF( ListGetLogical(Params,'Back Rotate N-T Solution',GotIt) ) THEN
+      CALL Fatal(Caller,'Explicit Systems cannot deal with N-T solutions!')
+    END IF
+
+    IF ( ListGetLogical( Solver % Values, 'Linear System Save',GotIt )) THEN
+      saveslot = ListGetString( Solver % Values,'Linear System Save Slot', GotIt )
+      IF(SaveSlot == 'linear solve') CALL SaveLinearSystem( Solver, A )
+    END IF
+
+!------------------------------------------------------------------------------
+
+    n = A % NumberOfRows
+
+    Method = ListGetString( Params, 'Timestepping Method', GotIt)
+    Explicit = (  Method == 'runge-kutta' .OR. Method == 'explicit euler' )
+
+    
+    
+    IF( Parallel ) THEN
+      ALLOCATE(Diag(n), TempRHS(n))
+      
+      TempRHS = b(1:n)
+      Diag = A % Values(A % Diag)
+      
+      CALL ParallelSumVector(A,Diag)
+      CALL ParallelSumVector(A,TempRHS)
+      
+      WHERE( Diag /= 0._dp )
+        x = TempRhs / Diag
+      END WHERE
+      
+      DEALLOCATE(Diag, TempRHS)
+    ELSE
+      x = b(1:n) / A % Values(A % Diag)           
+    END IF
+      
+    Norm = ComputeNorm(Solver, n, x)
+    
+  END SUBROUTINE SolveExplicitSystem
+
   
 !------------------------------------------------------------------------------
 !> Solve a system. Various additional utilities are included and 
@@ -14556,7 +14652,8 @@ END FUNCTION SearchNodeL
 !------------------------------------------------------------------------------
     TYPE(Variable_t), POINTER :: Var, NodalLoads
     TYPE(Mesh_t), POINTER :: Mesh, SaveMEsh
-    LOGICAL :: Relax, Found, NeedPrevSol, Timing, ResidualMode,ConstraintMode, BlockMode, GloNum
+    LOGICAL :: Relax, Found, NeedPrevSol, Timing, ResidualMode,ConstraintMode, BlockMode, &
+        ExplicitMode, GloNum
     INTEGER :: n,i,j,k,l,m,istat,nrows,ncols,colsj,rowoffset
     CHARACTER(LEN=MAX_NAME_LEN) :: Method, ProcName, VariableName
     INTEGER(KIND=AddrInt) :: Proc
@@ -14591,7 +14688,13 @@ END FUNCTION SearchNodeL
     ResidualMode = ListGetLogical( Params,'Linear System Residual Mode',Found )
     
     BlockMode = ListGetLogical( Params,'Linear System Block Mode',Found ) 
-      
+
+    ExplicitMode = ListGetLogical( Params,'Linear System Explicit Mode',Found ) 
+    IF(.NOT. Found ) THEN
+      ExplicitMode = ( ListGetString( Params,'Linear System Solver',Found ) == 'explicit' )
+    END IF
+
+       
 !------------------------------------------------------------------------------
 ! The allocation of previous values has to be here in order to 
 ! work properly with the Dirichlet elimination.
@@ -14658,8 +14761,11 @@ END FUNCTION SearchNodeL
     IF( BlockMode .AND. ConstraintMode ) THEN
       CALL Warn('SolveSystem','Matrix is constraint and block matrix, giving precedence to block nature!')
     END IF
-      
-    IF( BlockMode ) THEN
+
+    IF( ExplicitMode ) THEN
+      CALL Info('SolveSystem','Solving linear system with fully explicit methods',Level=10)
+      CALL SolveExplicitSystem(A,bb,x,Norm,DOFs,Solver)
+    ELSE IF( BlockMode ) THEN
       !ScaleSystem = ListGetLogical( Params,'Linear System Scaling', Found )
       !IF(.NOT. Found ) ScaleSystem = .TRUE.
       !IF ( ScaleSystem ) CALL ScaleLinearSystem(Solver, A )
