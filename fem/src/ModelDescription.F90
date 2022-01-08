@@ -1587,14 +1587,17 @@ CONTAINS
 
       INTEGER(KIND=AddrInt) :: Proc
 
-      INTEGER :: i,j,k,l,n,slen, str_beg, str_end, n1,n2, TYPE, &
-          abuflen=0, maxbuflen=0, iostat
+      INTEGER :: i,j,j0,k,l,n,slen, str_beg, str_end, n1,n2, TYPE, &
+          abuflen=0, maxbuflen=0, partag, iostat
+      LOGICAL :: disttag
+      
+      CHARACTER(*), PARAMETER :: Caller = 'SectionContents'
 
       ALLOCATE( ATt(1), ATx(1,1,1), IValues(1) )
       ALLOCATE(CHARACTER(MAX_STRING_LEN)::Name)
       ALLOCATE(CHARACTER(MAX_STRING_LEN)::str)
       ALLOCATE(CHARACTER(MAX_STRING_LEN)::Depname)
-
+      
 
       Name = ''
       DO WHILE( ReadAndTrim( InFileUnit,Name,Echo ) )
@@ -1607,7 +1610,7 @@ CONTAINS
         IF ( SEQL(Name,'include') ) THEN
           OPEN( InFileUnit-1,FILE=TRIM(Name(9:)),STATUS='OLD',IOSTAT=iostat)
           IF( iostat /= 0 ) THEN
-            CALL Fatal( 'SectionContents','Cannot find include file: '//TRIM(Name(9:)))
+            CALL Fatal( Caller,'Cannot find include file: '//TRIM(Name(9:)))
           END IF
             
           CALL SectionContents( Model,List,CheckAbort,FreeNames, &
@@ -1623,7 +1626,7 @@ CONTAINS
         SizeUnknown = .FALSE.
         
         DO WHILE( ReadAndTrim(InFileUnit,str,echo,string_literal) ) 
-
+          
           IF ( string_literal ) THEN
             ReturnType = .TRUE.
             CALL CheckKeyWord( Name, TypeString, CheckAbort,FreeNames,Section,ReturnType )
@@ -1636,9 +1639,13 @@ CONTAINS
             END IF
           END IF
 
+          ! Optional parameter tag
+          partag = 0
+          disttag = .FALSE.
+          
 20        CONTINUE
 
-          slen = LEN_TRIM(str)
+          slen = LEN_TRIM(str)          
           j = slen
           DO i=1,slen
             IF ( str(i:i)==' ') EXIT
@@ -1650,7 +1657,7 @@ CONTAINS
           SELECT CASE(Keyword)
             
           CASE('real')
-             CALL CheckKeyWord( Name,'real',CheckAbort,FreeNames,Section )
+            CALL CheckKeyWord( Name,'real',CheckAbort,FreeNames,Section )
 
              Proc = 0
              IF ( SEQL(str(str_beg:),'procedure ') ) THEN
@@ -1715,7 +1722,7 @@ CONTAINS
                IF ( .NOT. ScanOnly ) THEN 
                  SELECT CASE ( TYPE )
                  CASE (LIST_TYPE_CONSTANT_SCALAR )
-                   CALL Fatal('SectionContents', 'Constant expressions are not supported with Lua. &
+                   CALL Fatal(Caller, 'Constant expressions are not supported with Lua. &
                        Please provide at least a dummy argument.')
 
                    IF ( SizeGiven ) THEN
@@ -1788,7 +1795,7 @@ CONTAINS
                         IF (.NOT.ScanOnly ) THEN
                           READ( str(k:),*,iostat=iostat ) ATx(i,j,1)
                           IF( iostat /= 0 ) THEN
-                            CALL Fatal('SectionContents','Problem reading real keyword: '//TRIM(Name)//': '//str(k:)) 
+                            CALL Fatal(Caller,'Problem reading real keyword: '//TRIM(Name)//': '//str(k:)) 
                           END IF
                         END IF
                      END DO
@@ -1819,7 +1826,7 @@ CONTAINS
                    monotone = SEQL(str(str_beg:),'monotone')
                    IF( Monotone ) THEN
                      Cubic = SEQL(str(str_beg+9:),'cubic')
-                     IF( .NOT. Cubic ) CALL Warn('SectionContents','Monotone curves only applicable to cubic splines!')
+                     IF( .NOT. Cubic ) CALL Warn(Caller,'Monotone curves only applicable to cubic splines!')
                    END IF
                  END IF
 
@@ -1835,7 +1842,7 @@ CONTAINS
 
                      READ( str,*,iostat=iostat ) ATt(n)
                      IF( iostat /= 0 ) THEN
-                       CALL Fatal('SectionContents','Problem reading real keyword: '//TRIM(Name)//': '//str) 
+                       CALL Fatal(Caller,'Problem reading real keyword: '//TRIM(Name)//': '//str) 
                      END IF
 
                    ELSE
@@ -1871,7 +1878,7 @@ CONTAINS
                        IF ( .NOT. ScanOnly ) THEN
                          READ( str(k:),*,iostat=iostat ) ATx(i,j,n)
                          IF( iostat /= 0 ) THEN
-                           CALL Fatal('SectionContents','Problem reading real keyword: '//TRIM(Name)//': '//str(k:)) 
+                           CALL Fatal(Caller,'Problem reading real keyword: '//TRIM(Name)//': '//str(k:)) 
                          END IF
                        END IF
 
@@ -1882,7 +1889,7 @@ CONTAINS
 
 12               IF( .NOT. ScanOnly ) THEN
                    IF( n == 0 ) THEN
-                     CALL Fatal('SectionContents','Table dependence has zero size: '//TRIM(Name))
+                     CALL Fatal(Caller,'Table dependence has zero size: '//TRIM(Name))
                    END IF
                    
                    IF ( SizeGiven ) THEN
@@ -1896,6 +1903,18 @@ CONTAINS
                  MaxBufLen = MAX(MaxBuflen, Abuflen)
                END SELECT
              END IF
+
+             ! Add tag so we know how to make variation to this keyword
+             IF( partag > 0 ) THEN
+               CALL Info(Caller,'Adding parameter tag '&
+                   //TRIM(I2S(partag))//' to keyword: '//TRIM(Name),Level=7)
+               IF(.NOT. ScanOnly ) CALL ListParTagKeyword( List, Name, partag ) 
+             END IF
+             ! Add tag so we know to divide this keyword by the entity integral 
+             IF( disttag ) THEN               
+               IF(.NOT. ScanOnly ) CALL ListDistTagKeyword( List, Name )
+             END IF             
+                          
              EXIT
 
           CASE('logical')
@@ -1910,7 +1929,7 @@ CONTAINS
                  str(str_beg:str_beg) == '0' ) THEN
                  CALL ListAddLogical( List,Name,.FALSE. )
                ELSE 
-                 CALL Fatal('SectionContents','Problem reading logical keyword: '//TRIM(Name)//': '//TRIM(str(str_beg:)))
+                 CALL Fatal(Caller,'Problem reading logical keyword: '//TRIM(Name)//': '//TRIM(str(str_beg:)))
                END IF
             END IF
             EXIT
@@ -1965,7 +1984,7 @@ CONTAINS
                    IF ( .NOT. ScanOnly ) THEN
                      READ( str(k:),*,iostat=iostat ) IValues(i)
                      IF( iostat /= 0 ) THEN
-                       CALL Fatal('SectionContents','Problem reading integer keyword: '//TRIM(Name)//': '//str(k:)) 
+                       CALL Fatal(Caller,'Problem reading integer keyword: '//TRIM(Name)//': '//str(k:)) 
                      END IF
                    END IF
 
@@ -1975,7 +1994,7 @@ CONTAINS
                ELSE IF (.NOT.ScanOnly) THEN
                  READ( str(str_beg:),*,iostat=iostat ) k 
                  IF( iostat /= 0 ) THEN
-                   CALL Fatal('SectionContents','Problem reading integer keyword: '//TRIM(Name)//': '//str(str_beg:)) 
+                   CALL Fatal(Caller,'Problem reading integer keyword: '//TRIM(Name)//': '//str(str_beg:)) 
                  END IF                 
                  CALL ListAddInteger( List,Name,k )
                END IF
@@ -1998,7 +2017,7 @@ CONTAINS
             EXIT
 
           CASE('variable')
-
+            
             DO k=LEN(str),1,-1
               IF ( str(k:k) /= ' ' ) EXIT 
             END DO
@@ -2085,13 +2104,29 @@ CONTAINS
 
             SizeGiven = .TRUE.
 
+          CASE('-par')              
+            ! Start of integer field
+            j = str_beg
+            DO WHILE( j <= slen )
+              j = j + 1
+              IF ( str(j:j) == ' ') EXIT
+            END DO                                    
+            READ( str(str_beg:j),*,iostat=iostat ) partag
+            str = str(j+1:slen)
+            GOTO 20
+
+          CASE('-dist')              
+            ! divide the value of keyword by the area/volume of the entity
+            disttag = .TRUE. 
+            GOTO 20
+                       
           CASE('-remove')
 
             IF ( .NOT. ScanOnly ) CALL ListRemove( List, Name )
             EXIT
 
           CASE DEFAULT
-
+            
             ReturnType = .TRUE.
             CALL CheckKeyWord( Name, TypeString, CheckAbort, &
                      FreeNames,Section,ReturnType )
@@ -2101,6 +2136,7 @@ CONTAINS
             END IF
             CALL SyntaxError( Section, Name,str )
           END SELECT
+
 !------------------------------------------------------------------------------
         END DO
 !------------------------------------------------------------------------------

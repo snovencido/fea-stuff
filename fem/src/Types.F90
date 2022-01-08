@@ -410,6 +410,7 @@ MODULE Types
      LOGICAL :: LuaFun = .FALSE.
 #endif
      INTEGER :: partag = 0
+     LOGICAL :: disttag = .FALSE.
    END TYPE ValueListEntry_t
 
    TYPE ValueList_t

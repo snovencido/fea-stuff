@@ -2343,6 +2343,15 @@ use spariterglobals
      
      Ptr => list % Head
      DO WHILE( ASSOCIATED(ptr) )
+       IF( ptr % disttag ) THEN
+         WRITE( Message,'(A,ES12.5)') 'Normalizing > '//&
+             TRIM( ptr2 % Name )// ' < by ',Coeff
+         CALL Info('ListSetCoefficients',Message,Level=7)
+         ptr % Coeff = Coeff
+         ptr => ptr % Next 
+         CYCLE
+       END IF
+       
        n = ptr % NameLen
        IF ( n >= k ) THEN
          ! Did we find a keyword which has the correct suffix?
@@ -2372,7 +2381,50 @@ use spariterglobals
    END SUBROUTINE ListSetCoefficients
 !------------------------------------------------------------------------------
 
-   
+
+!------------------------------------------------------------------------------
+!> Add a parameter tag to an existing keyword.
+!------------------------------------------------------------------------------
+    SUBROUTINE ListParTagKeyword( List,Name,partag )
+!------------------------------------------------------------------------------
+      TYPE(ValueList_t), POINTER :: List
+      CHARACTER(LEN=*) :: Name
+      INTEGER :: partag
+!------------------------------------------------------------------------------
+      TYPE(ValueListEntry_t), POINTER :: ptr
+      LOGICAL :: Found
+!------------------------------------------------------------------------------
+      ptr => ListFind( List, Name, Found )
+      IF(.NOT. Found) THEN
+        CALL Fatal('ListParTagKeyword','Cannot add tag to non-existing keyword: '//TRIM(Name))
+      END IF        
+      Ptr % partag = partag
+        
+    END SUBROUTINE ListParTagKeyword
+!------------------------------------------------------------------------------
+
+
+!------------------------------------------------------------------------------
+!> Add tag to distribute value of existing keyword.
+!------------------------------------------------------------------------------
+    SUBROUTINE ListDistTagKeyword( List,Name )
+!------------------------------------------------------------------------------
+      TYPE(ValueList_t), POINTER :: List
+      CHARACTER(LEN=*) :: Name
+      INTEGER :: partag
+!------------------------------------------------------------------------------
+      TYPE(ValueListEntry_t), POINTER :: ptr
+      LOGICAL :: Found
+!------------------------------------------------------------------------------
+      ptr => ListFind( List, Name, Found )
+      IF(.NOT. Found) THEN
+        CALL Fatal('ListDistTagKeyword','Cannot add tag to non-existing keyword: '//TRIM(Name))
+      END IF        
+      Ptr % disttag = .TRUE.
+        
+    END SUBROUTINE ListDistTagKeyword
+!------------------------------------------------------------------------------
+  
 !------------------------------------------------------------------------------
 !> Finds a keyword with the given basename and sets an integer tag to it
 !> that may be used in sensitivity computation or optimization later on.
@@ -2495,6 +2547,7 @@ use spariterglobals
       DO WHILE( ASSOCIATED(ptr) )
         IF(partag == ptr % partag ) THEN
           ptr % coeff = mult * ptr % coeff
+          !PRINT *,'ptr coeff:',TRIM(ptr % name), ptr % coeff, mult
           cnt = cnt + 1
         END IF
         ptr => ptr % Next
