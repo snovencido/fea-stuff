@@ -63,22 +63,22 @@ End
 
 Body Force 1
   Name = "Heater1"
-  Heat Source = -par 1 1.0
+  Heat Source = -rpar 1 1.0
 End
 
 Body Force 2
   Name = "Heater2"
-  Heat Source = -par 2 2.0
+  Heat Source = -rpar 2 2.0
 End
 
 Body Force 3
   Name = "Heater3"
-  Heat Source = -par 3 3.0
+  Heat Source = -rpar 3 3.0
 End
 
 Body Force 4
   Name = "Heater4"
-  Heat Source = -par 4 4.0
+  Heat Source = -rpar 4 4.0
 End
 
 

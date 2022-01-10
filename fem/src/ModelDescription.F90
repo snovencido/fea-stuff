@@ -2104,7 +2104,7 @@ CONTAINS
 
             SizeGiven = .TRUE.
 
-          CASE('-par')              
+          CASE('-rpar')              
             ! Tag parameters that can be varied in the code
             j = str_beg
             DO WHILE( j <= slen )
@@ -6104,6 +6104,30 @@ END SUBROUTINE GetNodalElementSize
 
  END SUBROUTINE SetRealParametersMATC
 
+
+
+ !------------------------------------------------------------------------------
+ !> This routine add ths parameters as coefficients for the keywords in the sif
+ !> file referred to as "-rpar 1", "-rpar 2", etc. 
+ !-----------------------------------------------------------------------------
+ SUBROUTINE SetRealParametersKeywordCoeff(NoParam,Param,count)
+
+   INTEGER :: NoParam
+   REAL(KIND=dp), ALLOCATABLE :: Param(:)
+   INTEGER :: count
+   
+   INTEGER :: i
+   LOGICAL :: Found
+
+   count = 0
+   DO i=1,NoParam
+     CALL ListSetParameters( CurrentModel, i, Param(i),.FALSE., Found )
+     IF(Found) count = count + 1
+   END DO
+
+ END SUBROUTINE SetRealParametersKeywordCoeff
+
+ 
  !------------------------------------------------------------------------------
  !> This routine makes it possible to refer to the parameters
  !> in the .sif file by rpar(0), rpar(1),...
@@ -6135,7 +6159,8 @@ END SUBROUTINE GetNodalElementSize
 !> Adds parameters used in the simulation either predefined or from run control.
 !> The idea is to make parametrized simulations more simple to perform. 
 !------------------------------------------------------------------------------
- SUBROUTINE ControlParameters(Params,piter,GotParams,FinishEarly,PostSimulation)
+ SUBROUTINE ControlParameters(Params,piter,GotParams,FinishEarly,&
+     PostSimulation,SetCoeffs)
 
    IMPLICIT NONE
    
@@ -6143,7 +6168,7 @@ END SUBROUTINE GetNodalElementSize
    INTEGER :: piter
    LOGICAL :: GotParams,FinishEarly
    LOGICAL, OPTIONAL :: PostSimulation
-
+   LOGICAL, OPTIONAL :: SetCoeffs
 
    LOGICAL :: DoOptim, OptimalFinish, OptimalStart
    INTEGER :: NoParam, NoValues
@@ -6153,11 +6178,6 @@ END SUBROUTINE GetNodalElementSize
    CHARACTER(*), PARAMETER :: Caller = 'ControlParameters'
 
    SAVE Cost, Param, BestParam
-   
-   CALL Info(Caller, '-----------------------------------------', Level=5 )
-   CALL Info(Caller, 'Setting sweeping parameters for simulation',Level=4 )
-
-   FinishEarly = .FALSE.
 
    NoParam = ListGetInteger( Params,'Parameter Count',Found )
    IF(.NOT. Found ) THEN
@@ -6167,12 +6187,23 @@ END SUBROUTINE GetNodalElementSize
      CALL Info(Caller,'No parameters to set in "Run Control" loop!',Level=4)
      RETURN
    END IF
+   FinishEarly = .FALSE.
+
+   ! The MATC parameters must be present before reading the sif file
+   ! The coeffcients must be set after reading the sif file.
+   ! Hence we need a second, later, slot for the coefficient setup. 
+   IF( PRESENT(SetCoeffs)) THEN
+     IF( SetCoeffs ) THEN       
+       CALL SetRealParametersKeywordCoeff(NoParam,Param,NoParam)
+       CALL Info(Caller,'Set '//TRIM(I2S(NoParam))//&
+           ' coefficients with parameter tags!',Level=12)
+       RETURN
+     END IF
+   END IF
    
-   DoOptim = ListCheckPresent( Params,'Optimization Method')
-
-   OptimalStart = ListGetLogical(Params,'Optimal Restart',Found )
-
-   OptimalFinish = ListGetLogical( Params,'Parameter Optimal Finish',Found ) 
+   CALL Info(Caller, '-----------------------------------------', Level=5 )
+   CALL Info(Caller, 'Setting sweeping parameters for simulation',Level=4 )
+   
    NoValues = ListGetInteger( Params,'Run Control Iterations')
 
    IF( .NOT. ALLOCATED( Param ) ) THEN
@@ -6195,6 +6226,10 @@ END SUBROUTINE GetNodalElementSize
    ! Here we set the parameters in different ways.
    ! They may be predefined or set by some optimization method. 
    !-------------------------------------------------------------------
+   DoOptim = ListCheckPresent( Params,'Optimization Method')
+   OptimalStart = ListGetLogical(Params,'Optimal Restart',Found )
+   OptimalFinish = ListGetLogical( Params,'Parameter Optimal Finish',Found ) 
+
    IF( OptimalStart .AND. piter == 1 ) THEN
      CALL Info(Caller,'Trying to read previous optimal values from a file!')     
      CALL GetSavedOptimum()  
