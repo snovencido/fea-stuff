@@ -17240,6 +17240,60 @@ CONTAINS
 
 
 !------------------------------------------------------------------------------
+!> Get the node from on which the controlled value should be set. 
+!------------------------------------------------------------------------------
+  FUNCTION GetControlNode(Mesh,Perm,Params,nControl,iControl) RESULT ( ControlNode ) 
+    TYPE(Mesh_t), POINTER :: Mesh
+    INTEGER, POINTER :: Perm(:)
+    TYPE(ValueList_t), POINTER :: Params    
+    INTEGER :: nControl
+    INTEGER :: iControl
+    INTEGER :: ControlNode
+
+    INTEGER :: i
+    REAL(KIND=dp) :: Coord(3), MinDist
+    REAL(KIND=dp), POINTER :: RealWork(:,:)
+    LOGICAL :: Found
+    CHARACTER(LEN=MAX_NAME_LEN) :: str
+    CHARACTER(*), PARAMETER :: Caller = 'GetControlNode'
+   
+    str = 'Control Node Index' 
+    IF(nControl > 1) str = TRIM(str)//' '//TRIM(I2S(iControl))                
+    ControlNode = ListGetInteger( Params,str,Found )
+
+    IF(.NOT. Found ) THEN        
+      Coord = 0.0_dp
+      str = 'Control Node Coordinates'
+      RealWork => ListGetConstRealArray( Params,str,Found )           
+      IF(Found) THEN
+        i = iControl
+      ELSE
+        str = TRIM(str)//' '//TRIM(I2S(iControl))        
+        RealWork => ListGetConstRealArray( Params,str,Found )                         
+        i = 1
+      END IF
+
+      IF( Found ) THEN
+        IF(SIZE(RealWork,2)==1) THEN
+          Coord = RealWork(:,i)
+        ELSE
+          Coord = RealWork(i,:)
+        END IF
+
+        CALL FindClosestNode(Mesh,Coord,MinDist,ControlNode,ParEnv % PEs>1,Perm=Perm)
+        CALL Info(Caller,'Control Node located to index: '//TRIM(I2S(ControlNode)),Level=6)
+
+        str = 'Control Node Index'
+        IF(nControl > 1 ) str = TRIM(str)//' '//TRIM(I2S(iControl))  
+        CALL ListAddInteger( Params, str, ControlNode )
+      END IF
+    END IF
+
+  END FUNCTION GetControlNode
+
+
+  
+!------------------------------------------------------------------------------
 !> Given the operation point and an additional r.h.s. source vector find the
 !> amplitude for the latter one such that the control problem is resolved.
 !> We can request a field value at given point, for example. This tries to
@@ -17365,7 +17419,9 @@ CONTAINS
         IF(nControl > 1) str = TRIM(str)//' '//TRIM(I2S(iControl))        
         val = ListGetCReal( Params,str,UnfoundFatal=.TRUE.)
         cTarget(iControl) = val
-        i = GetControlNode()
+
+        i = GetControlNode(Mesh,Perm,Params,nControl,iControl) 
+
         IF(i>0) i = dofs*(Perm(i)-1)+dof0
         cDof(iControl) = i 
       END DO
@@ -17473,73 +17529,6 @@ CONTAINS
     END IF
 
     CALL Info(Caller,'All done for now',Level=15)
-
-    
-  CONTAINS
-
-
-    FUNCTION GetControlNode() RESULT ( ControlNode ) 
-
-      INTEGER :: ControlNode
-      
-      REAL(KIND=dp) :: Coord(3),Coord0(3),mindist,dist
-      REAL(KIND=dp), POINTER :: RealWork(:,:)
-            
-      str = 'Control Node Index' 
-      IF(nControl > 1) str = TRIM(str)//' '//TRIM(I2S(iControl))                
-      ControlNode = ListGetInteger( Params,str,Found )
-      
-      IF(.NOT. Found ) THEN        
-        Coord0 = 0.0_dp
-        str = 'Control Node Coordinates'
-        RealWork => ListGetConstRealArray( Params,str,Found )           
-        IF(Found) THEN
-          i = iControl
-        ELSE
-          str = TRIM(str)//' '//TRIM(I2S(iControl))        
-          RealWork => ListGetConstRealArray( Params,str,Found )                         
-          i = 1
-        END IF
-
-        IF( Found ) THEN
-          IF(SIZE(RealWork,2)==1) THEN
-            Coord0 = RealWork(:,i)
-          ELSE
-            Coord0 = RealWork(i,:)
-          END IF
-
-          CALL Info(Caller,'Locating control node coordinates',Level=15)
-
-          IF( InfoActive(20) ) THEN
-            PRINT *,'Finding node closest to:',i,Coord0
-          END IF
-          
-          mindist = HUGE( mindist )
-          DO i=1,Mesh % NumberOfNodes
-            IF( Perm(i) == 0 ) CYCLE             
-            Coord(1) = Mesh % Nodes % x(i)
-            Coord(2) = Mesh % Nodes % y(i)
-            Coord(3) = Mesh % Nodes % z(i)
-            
-            dist = SUM((Coord0-Coord)**2)
-            IF( dist < mindist ) THEN
-              mindist = dist
-              ControlNode = i
-            END IF
-          END DO
-          CALL Info(Caller,'Control Node located to index: '//TRIM(I2S(ControlNode)),Level=6)
-          
-          str = 'Control Node Index'
-          IF(nControl > 1 ) str = TRIM(str)//' '//TRIM(I2S(iControl))  
-          CALL ListAddInteger( Params, str, ControlNode )
-        END IF
-      END IF
-
-      IF( ControlNode > nsize ) CALL Fatal(Caller,&
-          'Invalid "Control Node Index": '//TRIM(I2S(ControlNode)))
-      
-    END FUNCTION GetControlNode
-
     
   END SUBROUTINE ControlLinearSystem
 
@@ -17624,7 +17613,10 @@ CONTAINS
           IF(nControl > 1) str = TRIM(str)//' '//TRIM(I2S(jControl))        
           val = ListGetCReal( Params,str,UnfoundFatal=.TRUE.)
           cTarget(jControl) = val
-          i = GetControlNode(jControl)
+          !i = GetControlNode(jControl)
+
+          i = GetControlNode(Mesh,Perm,Params,nControl,jControl) 
+
           IF(i>0) i = dofs*(Perm(i)-1)+dof0
           cDof(jControl) = i 
         END DO
@@ -17763,76 +17755,7 @@ CONTAINS
 
     END IF
       
-
     CALL Info(Caller,'All done for now',Level=15)
-
-    
-  CONTAINS
-
-
-    FUNCTION GetControlNode(iControl) RESULT ( ControlNode ) 
-
-      INTEGER :: iControl
-      INTEGER :: ControlNode
-      
-      REAL(KIND=dp) :: Coord(3),Coord0(3),mindist,dist
-      REAL(KIND=dp), POINTER :: RealWork(:,:)
-            
-      str = 'Control Node Index' 
-      IF(nControl > 1) str = TRIM(str)//' '//TRIM(I2S(iControl))                
-      ControlNode = ListGetInteger( Params,str,Found )
-      
-      IF(.NOT. Found ) THEN        
-        Coord0 = 0.0_dp
-        str = 'Control Node Coordinates'
-        RealWork => ListGetConstRealArray( Params,str,Found )           
-        IF(Found) THEN
-          i = iControl
-        ELSE
-          str = TRIM(str)//' '//TRIM(I2S(iControl))        
-          RealWork => ListGetConstRealArray( Params,str,Found )                         
-          i = 1
-        END IF
-
-        IF( Found ) THEN
-          IF(SIZE(RealWork,2)==1) THEN
-            Coord0 = RealWork(:,i)
-          ELSE
-            Coord0 = RealWork(i,:)
-          END IF
-
-          CALL Info(Caller,'Locating control node coordinates',Level=15)
-
-          IF( InfoActive(20) ) THEN
-            PRINT *,'Finding node closest to:',i,Coord0
-          END IF
-          
-          mindist = HUGE( mindist )
-          DO i=1,Mesh % NumberOfNodes
-            IF( Perm(i) == 0 ) CYCLE             
-            Coord(1) = Mesh % Nodes % x(i)
-            Coord(2) = Mesh % Nodes % y(i)
-            Coord(3) = Mesh % Nodes % z(i)
-            
-            dist = SUM((Coord0-Coord)**2)
-            IF( dist < mindist ) THEN
-              mindist = dist
-              ControlNode = i
-            END IF
-          END DO
-          CALL Info(Caller,'Control Node located to index: '//TRIM(I2S(ControlNode)),Level=6)
-          
-          str = 'Control Node Index'
-          IF(nControl > 1 ) str = TRIM(str)//' '//TRIM(I2S(iControl))  
-          CALL ListAddInteger( Params, str, ControlNode )
-        END IF
-      END IF
-
-      IF( ControlNode > nsize ) CALL Fatal(Caller,&
-          'Invalid "Control Node Index": '//TRIM(I2S(ControlNode)))
-      
-    END FUNCTION GetControlNode
-
     
   END SUBROUTINE ControlNonlinearSystem
 

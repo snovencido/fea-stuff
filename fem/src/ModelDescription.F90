@@ -2115,7 +2115,7 @@ CONTAINS
             str = str(j+1:slen)
             GOTO 20
 
-          CASE('-dist')              
+          CASE('-distribute')              
             ! Tag paramaters that will be divided by the entity area/volume
             disttag = .TRUE. 
             str = str(str_beg:slen)
