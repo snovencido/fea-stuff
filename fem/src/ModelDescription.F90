@@ -2105,7 +2105,7 @@ CONTAINS
             SizeGiven = .TRUE.
 
           CASE('-par')              
-            ! Start of integer field
+            ! Tag parameters that can be varied in the code
             j = str_beg
             DO WHILE( j <= slen )
               j = j + 1
@@ -2116,8 +2116,9 @@ CONTAINS
             GOTO 20
 
           CASE('-dist')              
-            ! divide the value of keyword by the area/volume of the entity
+            ! Tag paramaters that will be divided by the entity area/volume
             disttag = .TRUE. 
+            str = str(str_beg:slen)
             GOTO 20
                        
           CASE('-remove')
@@ -2458,7 +2459,13 @@ CONTAINS
     CALL LoadInputFile( Model,InFileUnit,ModelName,MeshDir,MeshName, .TRUE., .FALSE. )
     IF ( .NOT. OpenFile ) CLOSE( InFileUnit )
 
-
+    ! These are here to provide possibility to create tags for keywords
+    ! using suffixes. The new way would be to use prefix -dist.
+    ! The idea is to have a generic way to determine which keywords
+    ! are normalized by their entity integrals. 
+    CALL ListTagKeywords( Model,'normalize by area',.TRUE., Found ) 
+    CALL ListTagKeywords( Model,'normalize by volume',.TRUE., Found ) 
+           
     CALL ListAddNewString( Model % Simulation,'Solver Input File',ModelName ) 
     
     CALL InitializeOutputLevel( Model % Simulation )

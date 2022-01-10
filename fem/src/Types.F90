@@ -1028,6 +1028,9 @@ MODULE Types
       
       LOGICAL :: HarmonicCircuits
 
+! Tag counts to speed things up
+      INTEGER :: NumberOfDistTags=-1,NumberOfParTags=-1
+      
     END TYPE Model_t
 
     TYPE(Model_t),  POINTER :: CurrentModel

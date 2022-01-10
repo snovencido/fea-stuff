@@ -17563,8 +17563,8 @@ CONTAINS
     REAL(KIND=dp), POINTER :: x0(:),b(:),dr(:),r0(:),dy(:),y0(:),prevvalues(:),x(:),dx(:,:)
     INTEGER, POINTER :: Perm(:)
     INTEGER :: dofs, i, j, nsize, ControlNode, dof0, nControl, iControl=0,jControl
-    REAL(KIND=dp) :: Nrm, val, cand, mincand, Relax, Eps, mult
-    LOGICAL :: GotF, Found, UseLoads, ExtremumMode, DiagControl    
+    REAL(KIND=dp) :: Nrm, val, cand, mincand, Relax, Eps
+    LOGICAL :: GotF, Found, UseLoads, ExtremumMode, DiagControl, Multiply    
     REAL(KIND=dp), ALLOCATABLE :: cAmp(:), cTarget(:), cVal(:), dc(:), cSens(:,:)
     INTEGER, ALLOCATABLE :: cDof(:)
     TYPE(Model_t), POINTER :: Model    
@@ -17594,6 +17594,8 @@ CONTAINS
     nControl = ListGetInteger(Params,'Number of Controls',Found ) 
     IF(.NOT. Found ) nControl = 1
 
+    Multiply = .TRUE.
+    
     IF( PreSolve ) THEN
       IF( iControl == 0 ) THEN
         CALL Info(Caller,'Applying controlled sources',Level=7)     
@@ -17659,8 +17661,8 @@ CONTAINS
         END IF
       ELSE
         ! Remove variation of the parameters
-        mult = 1.0/(1.0_dp + eps)
-        CALL ListMultiplyParameters( Model, iControl, mult, Found )            
+        val = 1.0/(1.0_dp + eps)
+        CALL ListSetParameters( Model, iControl, val, multiply, Found )            
 
         dx(:,iControl) = x - x0
         
@@ -17728,10 +17730,12 @@ CONTAINS
           cAmp(jControl) = ListGetCReal( Params,str,Found)
           IF(.NOT. Found) cAmp(jControl) = 1.0_dp
 
-          mult = 1.0_dp + dc(jControl)
-          CALL ListMultiplyParameters( Model, jControl, mult, Found )            
+          val = 1.0_dp + dc(jControl)
+          cAmp(jControl) = val * cAmp(jControl) 
 
-          cAmp(jControl) = mult * cAmp(jControl) 
+          IF( .NOT. multiply ) val = cAmp(jControl)             
+          CALL ListSetParameters( Model, jControl, val, multiply, Found )            
+            
           CALL ListAddConstReal( Params, str, cAmp(jControl) )
         
           ! Apply control, this always to the solution - not to load
@@ -17750,8 +17754,8 @@ CONTAINS
       ELSE
         iControl = iControl + 1
         ! Add variation from the parameters
-        mult = (1.0_dp + eps)
-        CALL ListMultiplyParameters( Model, iControl, mult, Found )                    
+        val = (1.0_dp + eps)
+        CALL ListSetParameters( Model, iControl, val, multiply, Found )                    
 
         ! Start from the same base case with the matrix assembly
         x = prevvalues
