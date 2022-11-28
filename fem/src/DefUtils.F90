@@ -51,6 +51,7 @@ MODULE DefUtils
 
    USE Adaptive
    USE SolverUtils
+   USE ContactUtils
 
    IMPLICIT NONE
 
