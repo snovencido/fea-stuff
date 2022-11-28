@@ -47,7 +47,7 @@
        USE SParIterComm
        USE Interpolation
        USE CoordinateSystems
-       USE MeshUtils, ONLY: ReleaseMesh
+       USE MeshBasics 
 !-------------------------------------------------------------------------------
        TYPE(Mesh_t), TARGET  :: OldMesh, NewMesh
        TYPE(Variable_t), POINTER, OPTIONAL :: OldVariables, NewVariables
@@ -513,64 +513,6 @@
       
 CONTAINS
 
-!------------------------------------------------------------------------------
-   FUNCTION AllocateMesh() RESULT(Mesh)
-!------------------------------------------------------------------------------
-     TYPE(Mesh_t), POINTER :: Mesh
-!------------------------------------------------------------------------------
-     INTEGER :: istat
-
-     ALLOCATE( Mesh, STAT=istat )
-     IF ( istat /= 0 ) &
-        CALL Fatal( 'AllocateMesh', 'Unable to allocate a few bytes of memory?' )
-
-!    Nothing computed on this mesh yet!
-!    ----------------------------------
-     Mesh % SavesDone    = 0
-     Mesh % OutputActive = .FALSE.
-
-     Mesh % AdaptiveDepth = 0
-     Mesh % Changed   = .FALSE. !  TODO: Change this sometime
-
-     Mesh % Stabilize = .FALSE.
-
-     Mesh % Variables => NULL()
-     Mesh % Parent => NULL()
-     Mesh % Child => NULL()
-     Mesh % Next => NULL()
-     Mesh % RootQuadrant => NULL()
-     Mesh % Elements => NULL()
-     Mesh % Edges => NULL()
-     Mesh % Faces => NULL()
-     Mesh % Projector => NULL()
-     Mesh % NumberOfEdges = 0
-     Mesh % NumberOfFaces = 0
-     Mesh % NumberOfNodes = 0
-     Mesh % NumberOfBulkElements = 0
-     Mesh % NumberOfBoundaryElements = 0
-
-     Mesh % MaxFaceDOFs = 0
-     Mesh % MaxEdgeDOFs = 0
-     Mesh % MaxBDOFs = 0
-     Mesh % MaxElementDOFs  = 0
-     Mesh % MaxElementNodes = 0
-
-     Mesh % ViewFactors => NULL()
-
-     ALLOCATE( Mesh % Nodes, STAT=istat )
-     IF ( istat /= 0 ) &
-        CALL Fatal( 'AllocateMesh', 'Unable to allocate a few bytes of memory?' )
-     NULLIFY( Mesh % Nodes % x )
-     NULLIFY( Mesh % Nodes % y )
-     NULLIFY( Mesh % Nodes % z )
-     Mesh % Nodes % NumberOfNodes = 0
-
-     Mesh % ParallelInfo % NumberOfIfDOFs =  0
-     NULLIFY( Mesh % ParallelInfo % GlobalDOFs )
-     NULLIFY( Mesh % ParallelInfo % NodeInterface )
-     NULLIFY( Mesh % ParallelInfo % NeighbourList )
-         
-  END FUNCTION AllocateMesh
 !-------------------------------------------------------------------------------
 END SUBROUTINE InterpolateMeshToMesh
 !-------------------------------------------------------------------------------

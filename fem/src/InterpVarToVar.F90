@@ -34,8 +34,8 @@
 ! *
 ! ****************************************************************************/
 
-!InterpolateVarToVarReduced: Subroutine to interpolate variable values on a reduced
-!dimension mesh.  Either once or twice reduced (3D => line search, in the latter case)
+! InterpolateVarToVarReduced: Subroutine to interpolate variable values on a reduced
+! dimension mesh.  Either once or twice reduced (3D => line search, in the latter case)
 
 ! This subroutine is largely based on InterpolateMeshToMesh, with a few modifications
 !
@@ -60,10 +60,13 @@
 !------------------------------------------------------------------------------
 MODULE InterpVarToVar
 
-  USE DefUtils
   USE Types
+  USE Lists
+  USE MeshBasics
+  USE SParIterComm
   USE Interpolation
 
+  
   IMPLICIT NONE
 
 CONTAINS
@@ -612,7 +615,8 @@ CONTAINS
   SUBROUTINE InterpolateVarToVarReducedQ( OldMesh, NewMesh,HeightName,HeightDimensions, &
        FoundNodes, LocalDistances, OldNodeMask, NewNodeMask, OldElemMask, &
        Variables, GlobalEps, LocalEps, NumericalEps)
-    !This subroutine takes each boundary node on the specified boundary of the new mesh and finds its height (y coord in 2D) by performing (DIM - 1) interpolaton through boundary elements of the old mesh.
+    ! This subroutine takes each boundary node on the specified boundary of the new mesh and finds its height
+    ! (y coord in 2D) by performing (DIM - 1) interpolaton through boundary elements of the old mesh.
 
     !-------------------------------------------------------------------------------
     TYPE(Mesh_t), TARGET, INTENT(IN)  :: OldMesh
@@ -631,18 +635,18 @@ CONTAINS
     TYPE(Nodes_t) :: ElementNodes
     REAL(KIND=dp), POINTER :: OldHeight(:), NewHeight(:)
     INTEGER, POINTER :: OldPerm(:), NewPerm(:)
-    INTEGER :: i, j, k, l, n, ierr
+    INTEGER :: i, j, k, l, n, ierr, Permi
     REAL(KIND=dp), DIMENSION(3) :: Point
     INTEGER, POINTER :: NodeIndexes(:)
     INTEGER, ALLOCATABLE :: DefaultPerm(:)
     REAL(KIND=dp), DIMENSION(3) :: LocalCoordinates
     REAL(KIND=dp), POINTER :: ElementValues(:)
     REAL(KIND=dp) :: detJ, u,v,w,s, LocalDist
-    LOGICAL :: Found, Debug, FirstTime=.TRUE.,GMUnfound=.FALSE.
+    LOGICAL :: Found, Debug, GMUnfound=.FALSE.
     REAL(KIND=dp) :: eps_global_limit, eps_local_limit,&
          eps_global_init, eps_local_init, eps_global, eps_local, eps_numeric
 
-    SAVE DefaultPerm, FirstTime
+    SAVE DefaultPerm
     !------------------------------------------------------------------------------
 
     !========================================
@@ -652,11 +656,7 @@ CONTAINS
     Debug = .FALSE.
 
     !For hydromesh calving purposes
-    IF(HeightName == 'temp residual') THEN
-      GMUnfound = .TRUE.
-    ELSE
-      GMUnfound = .FALSE.
-    END IF
+    GMUnfound = (HeightName == 'temp residual') 
 
     IF(Debug) THEN
        PRINT *, 'Debug, present(OldNodeMask)', PRESENT(OldNodeMask)
@@ -680,7 +680,7 @@ CONTAINS
        ! Only actually for if new mesh has bigger perm than old mesh
        ! Which crashes on result output
        ! If inequality other way round, standard routine works fine
-       IF(NewMesh % NumberOfNodes .NE.  OldMesh % NumberOfNodes .OR. NewMesh % MeshDim .NE. OldMesh % MeshDim) THEN
+       IF(NewMesh % NumberOfNodes /=  OldMesh % NumberOfNodes .OR. NewMesh % MeshDim /= OldMesh % MeshDim) THEN
          !Special case for my calvinghydrointerp stuff
          PermVar => VariableGet( NewMesh % Variables, 'hydroweights', ThisOnly = .TRUE. )
          !On the assumption you'll have some velocity
@@ -766,14 +766,20 @@ CONTAINS
        IF( PRESENT(NewNodeMask)) THEN
           IF(NewNodeMask(i)) CYCLE
        END IF
-       IF( NewPerm(i) == 0 ) CYCLE
+
+       IF( ASSOCIATED( NewPerm ) ) THEN
+         Permi = NewPerm(i)
+         IF( Permi == 0 ) CYCLE
+       ELSE
+         Permi = i
+       END IF
 
        Point(1) = NewMesh % Nodes % x(i)
        Point(2) = NewMesh % Nodes % y(i)
        Point(3) = NewMesh % Nodes % z(i)
        Point(HeightDimensions) = 0.0_dp
 
-       IF(Debug) PRINT *, 'Debug point no: ',i,' Perm: ',NewPerm(i), Point(1),Point(2),Point(3)
+       IF(Debug) PRINT *, 'Debug point no: ',i,' Perm: ',Permi, Point(1),Point(2),Point(3)
        !------------------------------------------------------------------------------
        ! Go through all old mesh boundary elements
        !------------------------------------------------------------------------------
@@ -789,8 +795,10 @@ CONTAINS
 
              IF(Element % TYPE % DIMENSION > (3-SIZE(HeightDimensions))) CYCLE
 
-             IF( ANY( OldPerm( NodeIndexes ) == 0 ) ) CYCLE
-
+             IF( ASSOCIATED( OldPerm ) ) THEN
+               IF( ANY( OldPerm( NodeIndexes ) == 0 ) ) CYCLE
+             END IF
+               
              IF(PRESENT(OldElemMask)) THEN
                 IF(OldElemMask(k)) CYCLE
              END IF
@@ -854,8 +862,14 @@ CONTAINS
 
        IF(PRESENT(FoundNodes)) FoundNodes(i) = .TRUE.
 
-       ElementValues(1:n) = OldHeight( OldPerm(NodeIndexes) )
-       NewHeight(NewPerm(i)) = InterpolateInElement( &
+       IF( ASSOCIATED( OldPerm ) ) THEN
+         ElementValues(1:n) = OldHeight( OldPerm(NodeIndexes) )
+       ELSE
+         ElementValues(1:n) = OldHeight( NodeIndexes )
+       END IF
+
+         
+       NewHeight(Permi) = InterpolateInElement( &
             Element, ElementValues, LocalCoordinates(1), &
             LocalCoordinates(2), LocalCoordinates(3) )
 
@@ -866,17 +880,17 @@ CONTAINS
        !-------------------------------------------------------
        ! Interpolate full variable list if requested
        !-------------------------------------------------------
-       !For variables without perm (see change below)
-       IF(FirstTime) THEN
-         FirstTime = .FALSE.
-         ALLOCATE(DefaultPerm(OldMesh % NumberOfNodes))
-         DO j=1,OldMesh % NumberOfNodes
-           DefaultPerm(j) = j
-         END DO
-       END IF
-
        IF(PRESENT(Variables)) THEN
-          OldVar => Variables
+         
+         !For variables without perm (see change below)
+         IF(.NOT. ALLOCATED(DefaultPerm)) THEN
+           ALLOCATE(DefaultPerm(OldMesh % NumberOfNodes))
+           DO j=1,OldMesh % NumberOfNodes
+             DefaultPerm(j) = j
+           END DO
+         END IF
+
+         OldVar => Variables
           DO WHILE(ASSOCIATED(OldVar))
 
              IF((SIZE(OldVar % Values) == OldVar % DOFs) .OR. & !-global
