@@ -549,8 +549,10 @@ END FUNCTION isComponentName
     n = Circuit % n
     
     ALLOCATE(Circuit % ComponentIds(n))
-    ALLOCATE(CHARACTER(MAX_NAME_LEN)::Circuit % names(n))
-    ALLOCATE(CHARACTER(MAX_NAME_LEN)::Circuit % source(n))
+!   ALLOCATE(CHARACTER(MAX_NAME_LEN)::Circuit % names(n))
+!   ALLOCATE(CHARACTER(MAX_NAME_LEN)::Circuit % source(n))
+    ALLOCATE(Circuit % names(n))
+    ALLOCATE(Circuit % source(n))
     ALLOCATE(Circuit % CircuitVariables(n), Circuit % Perm(n) )
     ALLOCATE(Circuit % A(n,n), Circuit % B(n,n), &
              Circuit % Mre(n,n), Circuit % Mim(n,n)  )
