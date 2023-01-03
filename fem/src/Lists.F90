@@ -2051,7 +2051,7 @@ CONTAINS
      
      IF( ASSOCIATED( ptr ) ) THEN
        k2 = StringToLowerCase( str2,Name2,.TRUE. )
-       ptr % Name(1:k2) = str2(1:k2)
+       ptr % Name = str2(1:k2)
        ptr % NameLen = k2 
        !PRINT *,'renaming >'//str(1:k)//'< to >'//str2(1:k2)//'<', k, k2
      END IF

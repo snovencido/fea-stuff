@@ -14630,7 +14630,7 @@ SUBROUTINE SolveConstraintModesSystem( A, x, b, Solver )
         END IF
       END IF
 
-      CALL Info(Caller,'Solving for constrained mode: '//I2S(i),Level=6)        
+      CALL Info(Caller,'Solving for constrained mode: '//I2S(NMode),Level=6)
       i = Nmode
         
       ! The matrix has been manipulated already before. This ensures
