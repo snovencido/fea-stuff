@@ -1730,13 +1730,12 @@ CONTAINS
        ptr  => List % Head
        NULLIFY( prev )
        DO WHILE( ASSOCIATED(ptr) )
-         IF ( ptr % NameLen == k .AND. ptr % Name(1:k) == str(1:k) ) THEN
-           Found = .TRUE.
-           EXIT
-         ELSE
-           Prev => ptr
-           ptr  => ptr % Next 
-         END IF
+         Found = ptr % NameLen == k
+         IF(Found) Found = ptr % Name(1:k)  == str(1:k)
+         IF(Found) EXIT
+
+         Prev => Ptr
+         Ptr => Ptr % Next
        END DO
 
        IF ( Found ) THEN
