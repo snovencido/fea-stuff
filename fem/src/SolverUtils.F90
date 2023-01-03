@@ -142,7 +142,7 @@ CONTAINS
        dim = CoordinateSystemDimension()
        NT => CurrentModel % Solver % NormalTangential
        NT % NormalTangentialNOFNodes = 0
-       NT % NormalTangentialName = str
+       NT % NormalTangentialName = TRIM(str)
        CALL CheckNormalTangentialBoundary( CurrentModel, NT % NormalTangentialName, &
            NT % NormalTangentialNOFNodes, NT % BoundaryReorder, &
            NT % BoundaryNormals, NT % BoundaryTangent1, NT % BoundaryTangent2, dim )
