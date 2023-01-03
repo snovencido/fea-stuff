@@ -928,7 +928,8 @@ MODULE Types
     INTEGER, ALLOCATABLE :: ComponentIds(:), Perm(:)
     LOGICAL :: UsePerm = .FALSE., Harmonic, Parallel
     INTEGER :: n, m, n_comp,CvarDofs
-    CHARACTER(:), ALLOCATABLE :: names(:), source(:)
+!   CHARACTER(:), ALLOCATABLE :: names(:), source(:)
+    CHARACTER(MAX_NAME_LEN), ALLOCATABLE :: names(:), source(:)
     TYPE(Component_t), POINTER :: Components(:)
     TYPE(CircuitVariable_t), POINTER :: CircuitVariables(:)
   END TYPE Circuit_t

@@ -3270,12 +3270,7 @@ CONTAINS
 
       IF ( PRESENT(Proc) ) ptr % PROCEDURE = Proc
 
-      IF( n == 1 ) THEN
-        ptr % TYPE = LIST_TYPE_INTEGER
-      ELSE
-        ptr % TYPE = LIST_TYPE_CONSTANT_TENSOR
-      END IF
-      
+      ptr % TYPE = LIST_TYPE_INTEGER
       ptr % IValues(1:nv) = IValues(1:nv)
 
       n = LEN_TRIM(Name)
