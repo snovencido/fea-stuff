@@ -331,7 +331,7 @@
          CALL Info('ElmerSolver','Run Control section active!')
          OptimIters = ListGetInteger( Control % Control,'Run Control Iterations', Found )
          IF(.NOT. Found) OptimIters = 1              
-
+         
          ! If there are no parameters this does nothing
          CALL ControlParameters(Control % Control,1,GotParams,FinishEarly)
        ELSE
@@ -601,6 +601,18 @@
            CALL ControlParameters(CurrentModel % Control, &
                iSweep,GotParams,FinishEarly,.TRUE.)
          END DO
+
+         BLOCK
+           TYPE(Solver_t), POINTER :: iSolver
+           DO i=1,CurrentModel % NumberOfSolvers 
+             iSolver => CurrentModel % Solvers(i)
+             IF( iSolver % NumberOfConstraintModes > 0 ) THEN
+               IF( ListGetLogical( iSolver % Values,'Run Control Constraint Modes', Found ) ) THEN
+                 CALL FinalizeLumpedMatrix( iSolver )            
+               END IF
+             END IF
+           END DO
+         END BLOCK
          
        ELSE
          CALL ExecSimulation( TimeIntervals, CoupledMinIter, &
@@ -1446,7 +1458,7 @@
 
 
 
-  !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !> Adds coordinate and time variables to the current mesh structure. 
 !------------------------------------------------------------------------------
   SUBROUTINE AddTimeEtc()
@@ -3154,6 +3166,19 @@
      END DO ! timestep intervals, i.e. the simulation
 !------------------------------------------------------------------------------
 
+     BLOCK
+       TYPE(Solver_t), POINTER :: iSolver
+       DO i=1,CurrentModel % NumberOfSolvers 
+         iSolver => CurrentModel % Solvers(i)
+         IF( iSolver % NumberOfConstraintModes > 0 ) THEN
+           IF( ListGetLogical( iSolver % Values,'Steady State Constraint Modes', Found ) ) THEN
+             CALL FinalizeLumpedMatrix( iSolver )            
+           END IF
+         END IF
+       END DO
+     END BLOCK
+     
+     
 100  CONTINUE
 
      CALL ListPopNamespace()
