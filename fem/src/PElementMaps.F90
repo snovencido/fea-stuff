@@ -761,7 +761,7 @@ CONTAINS
 !>     Based on element face polynomial degree p, return degrees of freedom for
 !>     given face. 
 !------------------------------------------------------------------------------
-  FUNCTION getFaceDOFs( Element, p, faceNumber ) RESULT(faceDOFs)
+  FUNCTION getFaceDOFs(Element, p, faceNumber, Face ) RESULT(faceDOFs)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -783,6 +783,7 @@ CONTAINS
     IMPLICIT NONE
     
     TYPE(Element_t) :: Element
+    TYPE(Element_t), OPTIONAL :: Face
     INTEGER, INTENT(IN) :: p
     INTEGER, INTENT(IN), OPTIONAL :: faceNumber
     INTEGER :: faceDOFs
@@ -808,7 +809,7 @@ CONTAINS
     CASE (6)
        SELECT CASE(faceNumber)
           CASE (1)
-             IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+             IF (p >= 2) faceDOFs = (p-1)*p/2
           CASE (2:5)
              IF (p >= 3) faceDOFs = (p-1)*(p-2)/2
        END SELECT
@@ -822,7 +823,15 @@ CONTAINS
        END SELECT
     ! Brick   
     CASE (8)
-       IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+       IF (PRESENT(Face)) THEN
+         IF(Face % PDefs % pyramidQuad) THEN
+           IF (p >= 2) faceDOFs = (p-1)*p/2
+         ELSE
+           IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+         END IF
+       ELSE
+         IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+       END IF
     CASE DEFAULT
       WRITE(Message,'(A,I0)') 'Unsupported p element type: ',Element % TYPE % ElementCode
       CALL Warn('PElementMaps::getFaceDOFs',Message)
@@ -859,7 +868,7 @@ CONTAINS
     
     TYPE(Element_t) :: Element
     INTEGER, INTENT(IN) :: p
-    INTEGER :: bubbleDOFs
+    INTEGER :: bubbleDOFs, i
     
     ! This function is not defined for non p elements
     IF (.NOT. ASSOCIATED(Element % PDefs) ) THEN
@@ -884,13 +893,25 @@ CONTAINS
        IF (p >= 4) bubbleDOFs = (p-1)*(p-2)*(p-3)/6
     ! Pyramid
     CASE (6)
-       IF (p >= 4) bubbleDOFs = (p-1)*(p-2)*(p-3)/6
+       IF (p >= 3) THEN
+         DO i=0,p-3
+           bubbleDOFs = BubbleDOFs + (i+1)*(i+2)/2
+         END DO
+       END IF
     ! Wedge
     CASE (7)
        IF (p >= 5) bubbleDOFs = (p-2)*(p-3)*(p-4)/6
     ! Brick
     CASE (8)
-       IF (p >= 6) bubbleDOFs = (p-3)*(p-4)*(p-5)/6
+       IF (Element % PDefs % PyramidQuad) THEN
+         IF (p >= 3 ) THEN
+           DO i=0,p-3
+             bubbleDOFs = BubbleDOFs + (i+1)*(i+2)/2
+           END DO
+         END IF
+       ELSE
+         IF (p >= 6) bubbleDOFs = (p-3)*(p-4)*(p-5)/6
+       END IF
     CASE DEFAULT
        CALL Warn('PElementMaps::getBubbleDOFs','Unsupported p element type')
        bubbleDOFs = p

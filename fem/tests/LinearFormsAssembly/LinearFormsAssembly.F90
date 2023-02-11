@@ -760,7 +760,7 @@ CONTAINS
       ClonedElement % PDefs % TetraType = Element % PDefs % TetraType
       ClonedElement % PDefs % isEdge = Element % PDefs % isEdge
       ClonedElement % PDefs % GaussPoints = Element % PDefs % GaussPoints
-      ClonedElement % PDefs % pyramidQuadEdge = Element % PDefs % pyramidQuadEdge
+      ClonedElement % PDefs % pyramidQuad = Element % PDefs % pyramidQuad
       ClonedElement % PDefs % localNumber = Element % PDefs % localNumber
     END IF
     IF (ASSOCIATED( Element % NodeIndexes )) THEN
