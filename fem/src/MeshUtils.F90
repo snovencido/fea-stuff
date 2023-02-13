@@ -3162,7 +3162,7 @@ CONTAINS
 
        DO i=1,Mesh % NumberOfBulkElements
          Element => Mesh % Elements(i)
-         IF(ASSOCIATED(Element % PDefs)) THEN
+         IF(ASSOCIATED(Element % PDefs).AND.ASSOCIATED(Mesh % Faces)) THEN
            DO j=1,Element % Type % NumberOfFaces
              Element % PDefs % pyramidQuad = Element % Pdefs % PyramidQuad .OR. &
                    Mesh % Faces(Element % FaceIndexes(j)) % PDefs % PyramidQuad
