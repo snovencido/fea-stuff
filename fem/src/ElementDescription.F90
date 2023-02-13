@@ -2990,7 +2990,7 @@ CONTAINS
      REAL(KIND=dp) :: BubbleValue, dBubbledx(3), t, s, LtoGMap(3,3)
      LOGICAL :: invert, degrees, Compute2ndDerivatives
      INTEGER :: i, j, k, l, q, p, f, n, nb, dim, cdim, locali, localj,  &
-          tmp(4), direction(4)
+          tmp(4), direction(4), Indexes(Element % Type % NumberOfNodes)
      INTEGER :: BodyId, EDOFs, BDOFs, Deg_Bubble, tetraType
      REAL(KIND=dp) :: LinBasis(8), dLinBasisdx(8,3), ElmMetric(3,3)
 
@@ -3089,7 +3089,6 @@ CONTAINS
      CALL NodalBasisFunctions(n, Basis, element, u, v, w, pSolver)
      CALL NodalFirstDerivatives(n, dLBasisdx, element, u, v, w, pSolver)
 
-
      q = n
 
 !	dbasisdx(1:n,:) = dlbasisdx(1:n,:)
@@ -3121,6 +3120,11 @@ CONTAINS
         BodyId = 1
       END IF
 
+      ! If running in parallel use global indexing in orienting degrees of freedom
+      Indexes = Element % NodeIndexes
+      IF (ASSOCIATED(pSolver % Mesh % ParallelInfo % GlobalDOFs)) &
+        Indexes = pSolver % Mesh % ParallelInfo % GlobalDOFs(Indexes)
+
 !------------------------------------------------------------------------------
      SELECT CASE( Element % TYPE % ElementCode ) 
 !------------------------------------------------------------------------------
@@ -3137,7 +3141,7 @@ CONTAINS
            ! For boundary element integration check direction
            invert = .FALSE.
            IF ( Element % PDefs % isEdge .AND. &
-                Element % NodeIndexes(1)>Element % NodeIndexes(2) ) invert = .TRUE.
+                   Indexes(1)>Indexes(2) ) invert = .TRUE.
 
            ! For each bubble get the value of basis function
            DO i=1, BDOFs
@@ -3146,8 +3150,6 @@ CONTAINS
               
               Basis(q) = LineBubblePBasis(i+1,u,invert)
               dLBasisdx(q,1) = dLineBubblePBasis(i+1,u,invert)
-
-
               IF(Compute2ndDerivatives) THEN
                 ddLBasisddx(q,1,1) = ddLineBubblePBasis(i+1,u,invert)
               END IF
@@ -3175,7 +3177,7 @@ CONTAINS
 
               ! Invert edge for parity if needed
               invert = .FALSE.
-              IF ( Element % NodeIndexes(locali)>Element % NodeIndexes(localj) ) invert=.TRUE.
+              IF ( Indexes(locali)>Indexes(localj) ) invert=.TRUE.
 
               ! For each edge DOF get the value of p-basis function
               ! NOTE: Edges may not have correct information about the count of DOFs
@@ -3188,9 +3190,7 @@ CONTAINS
                  
                  ! Value of basis functions for edge=i and i=k+1 by parity
                  Basis(q) = TriangleEdgePBasis(i, k+1, u, v, invert)
-                 ! Value of derivative of basis function
                  dLBasisdx(q,1:2) = dTriangleEdgePBasis(i, k+1, u, v, invert)
-
                  IF(Compute2ndDerivatives) THEN
                    ddLBasisddx(q,1:2,1:2) = ddTriangleEdgePBasis(i,k+1,u,v,invert)
                  END IF
@@ -3220,7 +3220,7 @@ CONTAINS
            IF (Element % PDefs % isEdge) THEN
               direction = 0
               ! Get direction of this face (mask for face = boundary element nodes)
-              direction(1:3) = getTriangleFaceDirection(Element, [ 1,2,3 ])
+              direction(1:3) = getTriangleFaceDirection(Element, [ 1,2,3 ], Indexes)
            END IF
 
            bubbles_triangle: DO i = 0,p-3
@@ -3269,7 +3269,7 @@ CONTAINS
               
               ! Invert parity if needed
               invert = .FALSE.
-              IF (Element % NodeIndexes(locali) > Element % NodeIndexes(localj)) invert = .TRUE. 
+              IF (Indexes(locali) > Indexes(localj)) invert = .TRUE. 
 
               ! For each DOF in edge calculate the value of p-basis function
               DO k=1,EDOFs
@@ -3322,7 +3322,7 @@ CONTAINS
            ! For boundary element direction needs to be calculated
            IF (Element % PDefs % isEdge) THEN
               direction = 0
-              direction = getSquareFaceDirection(Element, [ 1,2,3,4 ])
+              direction = getSquareFaceDirection(Element, [ 1,2,3,4 ], Indexes )
            END IF
           
            ! For each bubble calculate the value of p basis function
@@ -3377,7 +3377,6 @@ CONTAINS
 
                  Basis(q) = TetraEdgePBasis(i,k+1,u,v,w,tetraType)
                  dLBasisdx(q,1:3) = dTetraEdgePBasis(i,k+1,u,v,w,tetraType)
-
                  IF(Compute2ndDerivatives) THEN
                     ddLBasisddx(q,1:3,1:3) = ddTetraEdgePBasis(i,k+1,u,v,w,tetraType)
                  END IF
@@ -3401,7 +3400,7 @@ CONTAINS
               !IF (GetFaceDOFs(Element, p, F) <= 0) CYCLE
 
               tmp(1:3) = getTetraFaceMap(F,tetraType)
-              direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3) )
+              direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3), Indexes )
 
               ! For each DOF in face calculate values of face function and 
               ! its derivatives for index pairs 
@@ -3478,7 +3477,7 @@ CONTAINS
               invert = .FALSE.
               
               ! Invert edge if local first node has greater global index than second one
-              IF ( Element % NodeIndexes(locali) > Element % NodeIndexes(localj) ) invert = .TRUE.
+              IF ( Indexes(locali) > Indexes(localj) ) invert = .TRUE.
 
               ! For each edge DOF k calculate the value of edge function
               ! and its derivatives
@@ -3518,7 +3517,7 @@ CONTAINS
                  direction = 0; invert=.FALSE.
                  ! Get global direction vector for enforcing parity
                  tmp(1:4) = getPyramidFaceMap(F)
-                 direction(1:4) = getSquareFaceDirection( Element, tmp(1:4) )
+                 direction(1:4) = getSquareFaceDirection( Element, tmp(1:4), Indexes )
 
                  ! For each face calculate the values of functions for index
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
@@ -3542,7 +3541,7 @@ CONTAINS
                  direction = 0
                  ! Get global direction vector for enforcing parity
                  tmp(1:4) = getPyramidFaceMap(F) 
-                 direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3) )
+                 direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3), Indexes )
 
                  ! For each face calculate the values of functions for index
                  ! pairs i,j=0,..,p-3 i+j=0,..,p-3
@@ -3617,7 +3616,7 @@ CONTAINS
               ! Determine edge direction
               invert = .FALSE.
               ! Invert edge if local first node has greater global index than second one
-              IF ( Element % NodeIndexes(locali) > Element % NodeIndexes(localj) ) invert = .TRUE.
+              IF ( Indexes(locali) > Indexes(localj) ) invert = .TRUE.
        
               ! For each edge DOF k calculate the value of edge function
               ! and its derivatives
@@ -3662,7 +3661,7 @@ CONTAINS
                  direction = 0
                  ! Get global direction vector for enforcing parity
                  tmp(1:4) = getWedgeFaceMap(F) 
-                 direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3) )
+                 direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3), Indexes )
                  
                  ! For each face calculate the values of functions for index
                  ! pairs i,j=0,..,p-3 i+j=0,..,p-3
@@ -3689,7 +3688,7 @@ CONTAINS
                  ! Get global direction vector for enforcing parity
                  invert = .FALSE.
                  tmp(1:4) = getWedgeFaceMap(F)
-                 direction(1:4) = getSquareFaceDirection( Element, tmp(1:4) )
+                 direction(1:4) = getSquareFaceDirection( Element, tmp(1:4), Indexes )
                  
                  ! First and second node must form a face in upper or lower triangle
                  IF (.NOT. wedgeOrdering(direction)) THEN
@@ -3782,7 +3781,7 @@ CONTAINS
               invert = .FALSE.
               
               ! Invert edge if local first node has greater global index than second one
-              IF (Element % NodeIndexes(locali)>Element % NodeIndexes(localj)) invert = .TRUE.
+              IF (Indexes(locali)>Indexes(localj)) invert = .TRUE.
               
               ! For each edge DOF k calculate the values of edge function
               ! and its derivatives
@@ -3828,7 +3827,7 @@ CONTAINS
               
               ! Generate direction vector for this face
               tmp(1:4) = getBrickFaceMap(F)
-              direction(1:4) = getSquareFaceDirection(Element, tmp)
+              direction(1:4) = getSquareFaceDirection(Element, tmp, Indexes)
 
               IF(Face % PDefs % pyramidQuad) THEN
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
@@ -3839,7 +3838,7 @@ CONTAINS
                       Basis(q) = BrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       dLBasisdx(q,:) = dBrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       IF (Compute2ndDerivatives) THEN
-!                       ddLBasisdx(q,1:3,1:3) = ddBrickPyraFacePBasis(F,i,j,u,v,w,direction)
+                        ddLBasisddx(q,1:3,1:3) = ddBrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       END IF
                       ! Polynomial degree of basis function to vector
                       IF (degrees) BasisDegree(q) = i+j
@@ -3882,10 +3881,7 @@ CONTAINS
              bubbles_brickpyra: DO i=0,p-3
                 DO j=0,p-i-3
                    DO k=0,p-i-j-3
-                      IF ( q >= SIZE(Basis)) then
-print*,'eh'
-EXIT bubbles_brickpyra
-endif
+                      IF ( q >= SIZE(Basis)) EXIT bubbles_brickpyra
                       q = q + 1
 
                       Basis(q) = BrickPyraBubblePBasis(i,j,k,u,v,w)
@@ -4327,6 +4323,7 @@ endif
      dim  = Element % TYPE % DIMENSION
      cdim = CoordinateSystemDimension()
 
+
      dBasisdxWrk = 0._dp ! avoid uninitialized stuff depending on coordinate dimension...
 
      ! Block the computation for large values of input points
@@ -4413,9 +4410,7 @@ endif
              IF (Element % PDefs % isEdge) THEN
                ! Get 2D face direction
                CALL H1Basis_GetFaceDirection(Element % Type % ElementCode, &
-                     1, &
-                     Element % NodeIndexes, &
-                     FaceDirection)
+                     1, Element % NodeIndexes, FaceDirection)
              END IF
            END IF
            IF (Element % PDefs % isEdge) THEN
@@ -4651,7 +4646,8 @@ BLOCK
                     direction = 0
                     ! Get global direction vector for enforcing parity
                     tmp(1:4) = getPyramidFaceMap(F)
-                    direction(1:4) = getSquareFaceDirection( Element, tmp(1:4) )
+                    direction(1:4) = getSquareFaceDirection( Element, tmp(1:4), &
+                           Element % NodeIndexes )
                  
                     ! For each face calculate values of functions from index
                     ! pairs i,j=2,..,p-2 i+j=4,..,p
@@ -4669,7 +4665,8 @@ BLOCK
                     direction = 0
                     ! Get global direction vector for enforcing parity
                     tmp(1:4) = getPyramidFaceMap(F) 
-                    direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3) )
+                    direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3), &
+                            Element % NodeIndexes )
                  
                     ! For each face calculate values of functions from index
                     ! pairs i,j=0,..,p-3 i+j=0,..,p-3
@@ -13826,30 +13823,31 @@ END FUNCTION PointFaceDistance
 !>     this routine returns global direction of triangle face so that 
 !>     functions are continuous over element boundaries
 !------------------------------------------------------------------------------
-  FUNCTION getTriangleFaceDirection( Element, FaceMap ) RESULT(globalDir)
+  FUNCTION getTriangleFaceDirection( Element, FaceMap, Indexes ) RESULT(globalDir)
 !------------------------------------------------------------------------------
     IMPLICIT NONE
 
     TYPE(Element_t) :: Element   !< Element to get direction to
     INTEGER :: FaceMap(3)        !< Element triangular face map
+    INTEGER :: Indexes(:)
     INTEGER :: globalDir(3)      !< Global direction of triangular face as local node numbers.
 !------------------------------------------------------------------------------
     INTEGER :: i, nodes(3)  
     nodes = 0
     
     ! Put global nodes of face into sorted order
-    nodes(1:3) = Element % NodeIndexes( FaceMap )
+    nodes(1:3) = Indexes( FaceMap )
     CALL sort(3, nodes)
     
     globalDir = 0
     ! Find local numbers of sorted nodes. These local nodes 
     ! span continuous functions over element boundaries
     DO i=1,Element % TYPE % NumberOfNodes
-       IF (nodes(1) == Element % NodeIndexes(i)) THEN
+       IF (nodes(1) == Indexes(i)) THEN
           globalDir(1) = i
-       ELSE IF (nodes(2) == Element % NodeIndexes(i)) THEN
+       ELSE IF (nodes(2) == Indexes(i)) THEN
           globalDir(2) = i
-       ELSE IF (nodes(3) == Element % NodeIndexes(i)) THEN
+       ELSE IF (nodes(3) == Indexes(i)) THEN
           globalDir(3) = i
        END IF
     END DO
@@ -13861,17 +13859,19 @@ END FUNCTION PointFaceDistance
 !>     this routine returns global direction of square face so that 
 !>     functions are continuous over element boundaries
 !------------------------------------------------------------------------------
-  FUNCTION getSquareFaceDirection( Element, FaceMap ) RESULT(globalDir)
+  FUNCTION getSquareFaceDirection( Element, FaceMap, Indexes ) RESULT(globalDir)
 !------------------------------------------------------------------------------
     IMPLICIT NONE
     TYPE(Element_t) :: Element   !< Element to get direction to
-    INTEGER :: FaceMap(4)        !< Element square face map
+    INTEGER :: FaceMap(:)        !< Element square face map
+    INTEGER :: Indexes(:)
     INTEGER :: globalDir(4)      !< Global direction of square face as local node numbers.
 !------------------------------------------------------------------------------
     INTEGER :: i, A,B,C,D, nodes(4), minGlobal
 
     ! Get global nodes 
-    nodes(1:4) = Element % NodeIndexes( FaceMap )
+    nodes(1:4) = Indexes( FaceMap )
+
     ! Find min global node
     minGlobal = nodes(1)
     A = 1
@@ -13899,13 +13899,13 @@ END FUNCTION PointFaceDistance
     ! over element boundaries
     globalDir = 0
     DO i=1,Element % TYPE % NumberOfNodes
-       IF (nodes(A) == Element % NodeIndexes(i)) THEN
+       IF (nodes(A) == Indexes(i)) THEN
           globalDir(1) = i
-       ELSE IF (nodes(B) == Element % NodeIndexes(i)) THEN
+       ELSE IF (nodes(B) == Indexes(i)) THEN
           globalDir(2) = i
-       ELSE IF (nodes(C) == Element % NodeIndexes(i)) THEN
+       ELSE IF (nodes(C) == Indexes(i)) THEN
           globalDir(4) = i
-       ELSE IF (nodes(D) == Element % NodeIndexes(i)) THEN
+       ELSE IF (nodes(D) == Indexes(i)) THEN
           globalDir(3) = i
        END IF
     END DO
