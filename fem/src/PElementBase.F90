@@ -2246,32 +2246,33 @@ END BLOCK
       value = 0
       SELECT CASE(edge)
       CASE (1)
-         value = 1d0/4*Phi(i,phiPar)*(1-v)*(1-w)
+         value = Phi(i,phiPar)*(1-v)*(1-w)
       CASE (2)
-         value = 1d0/4*Phi(i,phiPar)*(1+u)*(1-w)
+         value = Phi(i,phiPar)*(1+u)*(1-w)
       CASE (3)
-         value = 1d0/4*Phi(i,phiPar)*(1+v)*(1-w)
+         value = Phi(i,phiPar)*(1+v)*(1-w)
       CASE (4)
-         value = 1d0/4*Phi(i,phiPar)*(1-u)*(1-w)
+         value = Phi(i,phiPar)*(1-u)*(1-w)
       CASE (5)
-         value = 1d0/4*Phi(i,phiPar)*(1-v)*(1+w)
+         value = Phi(i,phiPar)*(1-v)*(1+w)
       CASE (6)
-         value = 1d0/4*Phi(i,phiPar)*(1+u)*(1+w)
+         value = Phi(i,phiPar)*(1+u)*(1+w)
       CASE (7)
-         value = 1d0/4*Phi(i,phiPar)*(1+v)*(1+w)
+         value = Phi(i,phiPar)*(1+v)*(1+w)
       CASE (8)
-         value = 1d0/4*Phi(i,phiPar)*(1-u)*(1+w)
+         value = Phi(i,phiPar)*(1-u)*(1+w)
       CASE (9)
-         value = 1d0/4*Phi(i,phiPar)*(1-u)*(1-v)
+         value = Phi(i,phiPar)*(1-u)*(1-v)
       CASE (10)
-         value = 1d0/4*Phi(i,phiPar)*(1+u)*(1-v)
+         value = Phi(i,phiPar)*(1+u)*(1-v)
       CASE (11)
-         value = 1d0/4*Phi(i,phiPar)*(1+u)*(1+v)
+         value = Phi(i,phiPar)*(1+u)*(1+v)
       CASE (12)
-         value = 1d0/4*Phi(i,phiPar)*(1-u)*(1+v)
+         value = Phi(i,phiPar)*(1-u)*(1+v)
       CASE DEFAULT
          CALL Fatal('PElementBase::BrickEdgePBasis','Unknown edge for brick')
       END SELECT 
+      value = value/4
     END FUNCTION BrickEdgePBasis
 
 
@@ -2339,64 +2340,64 @@ END BLOCK
       SELECT CASE(edge)
       CASE (1)
          phiU = Phi(i,phiPar)
-         grad(1) = 1d0/4*dPhi(i,phiPar)*(1-v)*(1-w)
-         grad(2) = -1d0/4*phiU*(1-w)
-         grad(3) = -1d0/4*phiU*(1-v)
+         grad(1) = dPhi(i,phiPar)*(1-v)*(1-w)
+         grad(2) = -phiU*(1-w)
+         grad(3) = -phiU*(1-v)
       CASE (2)
          phiV = Phi(i,phiPar)
-         grad(1) = 1d0/4*phiV*(1-w)
-         grad(2) = 1d0/4*dPhi(i,phiPar)*(1+u)*(1-w)
-         grad(3) = -1d0/4*phiV*(1+u)
+         grad(1) = phiV*(1-w)
+         grad(2) = dPhi(i,phiPar)*(1+u)*(1-w)
+         grad(3) = -phiV*(1+u)
       CASE (3)
          phiU = Phi(i,phiPar)
-         grad(1) = 1d0/4*dPhi(i,phiPar)*(1+v)*(1-w)
-         grad(2) = 1d0/4*phiU*(1-w)
-         grad(3) = -1d0/4*phiU*(1+v)
+         grad(1) = dPhi(i,phiPar)*(1+v)*(1-w)
+         grad(2) = phiU*(1-w)
+         grad(3) = -phiU*(1+v)
       CASE (4)
          phiV = Phi(i,phiPar)
-         grad(1) = -1d0/4*phiV*(1-w)
-         grad(2) = 1d0/4*dPhi(i,phiPar)*(1-u)*(1-w)
-         grad(3) = -1d0/4*phiV*(1-u)
+         grad(1) = -phiV*(1-w)
+         grad(2) = dPhi(i,phiPar)*(1-u)*(1-w)
+         grad(3) = -phiV*(1-u)
       CASE (5)
          phiU = Phi(i,phiPar)
-         grad(1) = 1d0/4*dPhi(i,phiPar)*(1-v)*(1+w)
-         grad(2) = -1d0/4*phiU*(1+w)
-         grad(3) = 1d0/4*phiU*(1-v)
+         grad(1) = dPhi(i,phiPar)*(1-v)*(1+w)
+         grad(2) = -phiU*(1+w)
+         grad(3) = phiU*(1-v)
       CASE (6)
          phiV = Phi(i,phiPar)
-         grad(1) = 1d0/4*phiV*(1+w)
-         grad(2) = 1d0/4*dPhi(i,phiPar)*(1+u)*(1+w)
-         grad(3) = 1d0/4*phiV*(1+u)
+         grad(1) = phiV*(1+w)
+         grad(2) = dPhi(i,phiPar)*(1+u)*(1+w)
+         grad(3) = phiV*(1+u)
       CASE (7)
          phiU = Phi(i,phiPar)
-         grad(1) = 1d0/4*dPhi(i,phiPar)*(1+v)*(1+w)
-         grad(2) = 1d0/4*phiU*(1+w)
-         grad(3) = 1d0/4*phiU*(1+v)
+         grad(1) = dPhi(i,phiPar)*(1+v)*(1+w)
+         grad(2) = phiU*(1+w)
+         grad(3) = phiU*(1+v)
       CASE (8)
          phiV = Phi(i,phiPar)
-         grad(1) = -1d0/4*phiV*(1+w)
-         grad(2) = 1d0/4*dPhi(i,phiPar)*(1-u)*(1+w)
-         grad(3) = 1d0/4*phiV*(1-u)
+         grad(1) = -phiV*(1+w)
+         grad(2) = dPhi(i,phiPar)*(1-u)*(1+w)
+         grad(3) = phiV*(1-u)
       CASE (9)
          phiW = Phi(i,phiPar)
-         grad(1) = -1d0/4*phiW*(1-v)
-         grad(2) = -1d0/4*phiW*(1-u)
-         grad(3) = 1d0/4*dPhi(i,phiPar)*(1-u)*(1-v)
+         grad(1) = -phiW*(1-v)
+         grad(2) = -phiW*(1-u)
+         grad(3) = dPhi(i,phiPar)*(1-u)*(1-v)
       CASE (10)
          phiW = Phi(i,phiPar)
-         grad(1) = 1d0/4*phiW*(1-v)
-         grad(2) = -1d0/4*phiW*(1+u)
-         grad(3) = 1d0/4*dPhi(i,phiPar)*(1+u)*(1-v)
+         grad(1) = phiW*(1-v)
+         grad(2) = -phiW*(1+u)
+         grad(3) = dPhi(i,phiPar)*(1+u)*(1-v)
       CASE (11)
          phiW = Phi(i,phiPar)
-         grad(1) = 1d0/4*phiW*(1+v)
-         grad(2) = 1d0/4*phiW*(1+u)
-         grad(3) = 1d0/4*dPhi(i,phiPar)*(1+u)*(1+v)
+         grad(1) = phiW*(1+v)
+         grad(2) = phiW*(1+u)
+         grad(3) = dPhi(i,phiPar)*(1+u)*(1+v)
       CASE (12)
          phiW = Phi(i,phiPar)
-         grad(1) = -1d0/4*phiW*(1+v)
-         grad(2) = 1d0/4*phiW*(1-u)
-         grad(3) = 1d0/4*dPhi(i,phiPar)*(1-u)*(1+v)
+         grad(1) = -phiW*(1+v)
+         grad(2) = phiW*(1-u)
+         grad(3) = dPhi(i,phiPar)*(1-u)*(1+v)
       CASE DEFAULT
          CALL Fatal('PElementBase::dBrickEdgePBasis','Unknown edge for brick')
       END SELECT 
@@ -2416,6 +2417,7 @@ END BLOCK
             grad(3) = -grad(3)
          END SELECT
       END IF
+      grad = grad/4
     END FUNCTION dBrickEdgePBasis
 
 
@@ -2629,9 +2631,9 @@ END BLOCK
 
       ! For inverted edges swap direction
       IF (invert) THEN
-        phiPar = La-Lb
+        phiPar = La - Lb
       ELSE
-        phiPar = Lb-La
+        phiPar = Lb - La
       END IF
 
       ! Get value of edge function
@@ -2713,7 +2715,7 @@ END BLOCK
 
       ! Get value of edge function
       vPhi = varPhi(i,Lb-La)
-      grad = dNa*Nb*vPhi + Na*dNb*vPhi + Na*Nb*dVarPhi(i,Lb-La)*(dLb-dLa)
+      grad = dNa*Nb*vPhi + Na*dNb*vPhi + Na*Nb*dvarPhi(i,Lb-La)*(dLb-dLa)
     END FUNCTION dBrickPyraEdgePBasis
 
 
@@ -2755,7 +2757,7 @@ END BLOCK
       ! Variables
       LOGICAL :: invert
       REAL (KIND=dp) :: Na,Nb,La,Lb, vPhi, PhiPar, ddNa(3,3), ddNb(3,3), grad(3,3)
-      REAL (KIND=dp), DIMENSION(3) :: dNa, dNb, dLa, dLb, dPhiPar, dvPhi(3), ddvPhi(3,3)
+      REAL (KIND=dp) :: dNa(3), dNb(3), dLa(3), dLb(3), dPhiPar(3), dvPhi(3), ddvPhi(3,3)
       INTEGER :: nodes(2), swap, p,q
 
       ! By default do not invert edges
@@ -2775,7 +2777,7 @@ END BLOCK
       Nb  = BrickNodalPBasis(nodes(2),u,v,w)
 
       dNa = dBrickNodalPBasis(nodes(1),u,v,w)
-      dNa = dBrickNodalPBasis(nodes(1),u,v,w)
+      dNa = dBrickNodalPBasis(nodes(2),u,v,w)
 
       ddNa = ddBrickNodalPBasis(nodes(1),u,v,w)
       ddNb = ddBrickNodalPBasis(nodes(2),u,v,w)
@@ -2802,6 +2804,7 @@ END BLOCK
       END DO
 
 !     grad(1) = dNa(1)*Nb*vPhi + Na*dNb(1)*vPhi + Na*Nb*dvPhi(1)
+#if 0
       grad = 0
       grad(1,1) = grad(1,1) + ddNa(1,1)*Nb*vPhi + dNa(1)*dNb(1)*vPhi + dNa(1)*Nb*dvPhi(1)
       grad(1,1) = grad(1,1) + dNa(1)*dNb(1)*vPhi + Na*ddNb(1,1)*vPhi + Na*dNb(1)*dvPhi(1)
@@ -2826,7 +2829,17 @@ END BLOCK
       grad(3,3) = grad(3,3) + ddNa(3,3)*Nb*vPhi + dNa(3)*dNb(3)*vPhi + dNa(3)*Nb*dvPhi(3)
       grad(3,3) = grad(3,3) + dNa(3)*dNb(3)*vPhi + Na*ddNb(3,3)*vPhi + Na*dNb(3)*dvPhi(3)
       grad(3,3) = grad(3,3) + dNa(3)*Nb*dvPhi(3) + Na*dNb(3)*dvPhi(3) + Na*Nb*ddvPhi(3,3)
+#else
+      BLOCK
+        REAL(KIND=dp) :: f(3), df(3,3), ddf(3,3,3)
 
+        f(1)=Na; f(2)=Nb; f(3)=vPhi
+        df(1,:)=dNa; df(2,:)=dNb; df(3,:) = dVphi
+        ddf(1,:,:)=ddNa; ddf(2,:,:)=ddNb; ddf(3,:,:)=ddVphi 
+
+        grad = Product2ndDerivatives(3,f,df,ddf,3,0)
+      END BLOCK
+#endif
       grad(2,1) = grad(1,2)
       grad(3,1) = grad(1,3)
       grad(3,2) = grad(2,3)
@@ -2868,7 +2881,7 @@ END BLOCK
       INTEGER, DIMENSION(4), OPTIONAL :: localNumbers
       ! Variables
       INTEGER, DIMENSION(4) :: local
-      REAL (KIND=dp) :: La, Lb, Lc, Lh, value, s, t, Pa, Pb, dPa(3), dPb(3)
+      REAL (KIND=dp) :: La, Lb, Lc, Lh, value, Pa, Pb
 
       ! If local numbering not present use default numbering
       IF (.NOT. PRESENT(localNumbers)) THEN
@@ -2877,17 +2890,16 @@ END BLOCK
          local(1:4) = localNumbers(1:4)
       END IF
 
+      Pa  = BrickNodalPBasis(local(1),u,v,w)
+      Pb  = BrickNodalPBasis(local(3),u,v,w)
+
       ! Set parameters for face value calculation
       La = BrickL(local(1),u,v,w)
       Lb = BrickL(local(2),u,v,w)
       Lc = BrickL(local(4),u,v,w)
 
       ! Calculate value of function from general form
-      s = Lb-La
-      t = Lc-La
-      Pa  = BrickNodalPBasis(local(1),u,v,w)
-      Pb  = BrickNodalPBasis(local(3),u,v,w)
-      value = Pa*Pb*LegendreP(i,s)*LegendreP(j,t)
+      value = Pa*Pb*LegendreP(i,Lb-La)*LegendreP(j,Lc-La)
     END FUNCTION BrickPyraFacePBasis
 
 
@@ -2927,9 +2939,9 @@ END BLOCK
 
       ! Variables
       INTEGER, DIMENSION(4) :: local
-      REAL (KIND=dp) :: La, Lb, Lc, Lh, phiI, phiJ, Pa, Pb, s, t
+      REAL (KIND=dp) :: La, Lb, Lc, Lh, phiI, phiJ, Pa, Pb
       REAL (KIND=dp), DIMENSION(3) :: dLa, dLb, dLc, dLh, grad, &
-                 dPhiI, dPhiJ, dPa,dPb, ds,dt
+                 dPhiI, dPhiJ, dPa,dPb
       
       ! If local numbering not present use default numbering
       IF (.NOT. PRESENT(localNumbers)) THEN
@@ -2947,22 +2959,16 @@ END BLOCK
       dLb = dBrickL(local(2),u,v,w)
       dLc = dBrickL(local(4),u,v,w)
 
-      s = Lb-La
-      ds = dLb-dLa
-
-      t = Lc-La
-      dt = dLc-dLa
-
       Pa  = BrickNodalPBasis(local(1),u,v,w)
       Pb  = BrickNodalPBasis(local(3),u,v,w)
 
       dPa = dBrickNodalPBasis(local(1),u,v,w)
       dPb = dBrickNodalPBasis(local(3),u,v,w)
 
-      PhiI  = LegendreP(i,s)
-      PhiJ  = LegendreP(j,t)
-      dPhiI = dLegendreP(i,s)*ds
-      dPhiJ = dLegendreP(j,t)*dt
+      PhiI  = LegendreP(i,Lb-La)
+      PhiJ  = LegendreP(j,Lc-La)
+      dPhiI = dLegendreP(i,Lb-La)*(dLb-dLa)
+      dPhiJ = dLegendreP(j,Lc-La)*(dLc-dLa)
 
       grad = (dPa*Pb*phiI*phiJ + Pa*dPb*PhiI*phiJ + &
               Pa*Pb*dPhiI*PhiJ + Pa*Pb*PhiI*dPhiJ)
@@ -3055,7 +3061,7 @@ END BLOCK
 
 !     grad = (dPa(1)*Pb*phiI*phiJ + Pa*dPb(1)*PhiI*phiJ + &
 !             Pa*Pb*dPhiI(1)*PhiJ + Pa*Pb*PhiI*dPhiJ(1))
-
+#if 0
       grad=0
       grad(1,1) = grad(1,1) + ddPa(1,1)*Pb*PhiI*PhiJ + dPa(1)*dPb(1)*PhiI*PhiJ + &
                               dPa(1)*Pb*dPhiI(1)*PhiJ + dPa(1)*Pb*PhiI*dPhiJ(1)
@@ -3111,6 +3117,17 @@ END BLOCK
       grad(3,3) = grad(3,3) + dPa(3)*Pb*PhiI*dPhiJ(3) + Pa*dPb(3)*PhiI*dPhiJ(3) + &
                               Pa*Pb*dPhiI(3)*dPhiJ(3) + dPa(3)*Pb*PhiI*ddPhiJ(3,3)
 
+#else
+      BLOCK
+        REAL(KIND=dp) :: f(4), df(4,3), ddf(4,3,3)
+
+        f(1)=Pa; f(2)=Pb; f(3)=PhiI; f(4)=PhiJ
+        df(1,:)=dPa; df(2,:)=dPb; df(3,:) = dphiI; df(4,:)=dPhiJ
+        ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb; ddf(3,:,:)=ddphiI; ddf(4,:,:)=ddPhiJ
+
+        grad = Product2ndDerivatives(4,f,df,ddf,3,0)
+      END BLOCK
+#endif
       grad(2,1) = grad(1,2)
       grad(3,1) = grad(1,3)
       grad(3,2) = grad(2,3)
@@ -3146,9 +3163,7 @@ END BLOCK
 
       Pa = BrickNodalPBasis(1,u,v,w)
       Pb = BrickNodalPBasis(7,u,v,w)
-
-      s = w/SQRT(2._dP)
-      value = Pa*Pb*LegendreP(i,u)*LegendreP(j,v)*LegendreP(k,2*s-1)
+      value = Pa*Pb*LegendreP(i,u)*LegendreP(j,v)*LegendreP(k,w)
     END FUNCTION BrickPyraBubblePBasis
 
 
@@ -3184,18 +3199,17 @@ END BLOCK
       dPa = dBrickNodalPBasis(1,u,v,w)
       dPb = dBrickNodalPBasis(7,u,v,w)
 
-      s = w/SQRT(2._dp)
       Lu = LegendreP(i,u)
       Lv = LegendreP(j,v)
-      Lw = LegendreP(k,2*s-1)
+      Lw = LegendreP(k,w)
 
       dLu=0; dLv=0; dLw=0
       dLu(1) = dLegendreP(i,u)
       dLv(2) = dLegendreP(j,v)
-      dLw(3) = dLegendreP(k,2*s-1)*2/SQRT(2._dp)
+      dLw(3) = dLegendreP(k,w)
 
-      grad=dPa*Pb*Lu*Lv*Lw + Pa*dPb*Lu*Lv*Lw + Pa*Pb*dLu*Lv*Lw + &
-           Pa*Pb*Lu*dLv*Lw + Pa*Pb*Lu*Lv*dLw
+      grad = dPa*Pb*Lu*Lv*Lw + Pa*dPb*Lu*Lv*Lw + Pa*Pb*dLu*Lv*Lw + &
+             Pa*Pb*Lu*dLv*Lw + Pa*Pb*Lu*Lv*dLw
     END FUNCTION dBrickPyraBubblePBasis
 !------------------------------------------------------------------------------
 
@@ -3223,7 +3237,7 @@ END BLOCK
       INTEGER, INTENT(IN) :: i, j, k
       REAL (KIND=dp), INTENT(IN) :: u, v, w
       ! Result
-      REAL (KIND=dp) :: grad(3,3),s,Pa,Pb,Lu,Lv,Lw,dPa(3),dPb(3),dLu(3),dLv(3),dLw(3)
+      REAL (KIND=dp) :: grad(3,3),Pa,Pb,Lu,Lv,Lw,dPa(3),dPb(3),dLu(3),dLv(3),dLw(3)
       REAL (KIND=dp) :: ddLu(3,3),ddLv(3,3),ddLw(3,3),ddPa(3,3),ddPb(3,3)
 
       Pa  = BrickNodalPBasis(1,u,v,w)
@@ -3233,31 +3247,30 @@ END BLOCK
       ddPa = ddBrickNodalPBasis(1,u,v,w)
       ddPb = ddBrickNodalPBasis(7,u,v,w)
 
-      s = w/SQRT(2._dp)
       Lu = LegendreP(i,u)
       Lv = LegendreP(j,v)
-      Lw = LegendreP(k,2*s-1)
+      Lw = LegendreP(k,w)
 
       dLu=0; dLv=0; dLw=0
       dLu(1) = dLegendreP(i,u)
       dLv(2) = dLegendreP(j,v)
-      dLw(3) = dLegendreP(k,2*s-1)*2/SQRT(2._dp)
+      dLw(3) = dLegendreP(k,w)
 
       ddLu=0; ddLv=0; ddLw=0
       ddLu(1,1) = ddLegendreP(i,u)
       ddLv(2,2) = ddLegendreP(j,v)
-      ddLw(3,3) = ddLegendreP(k,2*s-1)*2
+      ddLw(3,3) = ddLegendreP(k,w)
 
 !     grad=dPa*Pb*Lu*Lv*Lw + Pa*dPb*Lu*Lv*Lw + Pa*Pb*dLu*Lv*Lw + &
 !          Pa*Pb*Lu*dLv*Lw + Pa*Pb*Lu*Lv*dLw
       BLOCK
         REAL(KIND=dp) :: f(5), df(5,3), ddf(5,3,3)
 
-        f(1)=Pa; f(2)=Pb; f(3)=Lu; f(4)=Lv; f(5)=Lw
+        f=[Pa, Pb, Lu, Lv, Lw]
         df(1,:)=dPa; df(2,:)=dPb;
-        df(3,:)=dLu; df(4,:)=Lv; df(5,:)=Lw
+        df(3,:)=dLu; df(4,:)=dLv; df(5,:)=dLw
         ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb;
-        ddf(3,:,:)=ddLu; ddf(4,:,:)=ddLv; ddf(5,:,:)=Lw
+        ddf(3,:,:)=ddLu; ddf(4,:,:)=ddLv; ddf(5,:,:)=ddLw
 
         grad = Product2ndDerivatives(5,f,df,ddf,3,0)
       END BLOCK
@@ -3691,8 +3704,6 @@ END BLOCK
     END FUNCTION BrickBubblePBasis
 
 
-
-
     FUNCTION PyramidTL(which, u, v, w) RESULT(value)
       IMPLICIT NONE
       
@@ -3706,13 +3717,13 @@ END BLOCK
       s = w/SQRT(2.0_dp)
       SELECT CASE(which)
       CASE (1)
-         value = (2-u-v-s)/4d0
+         value = (2-u-v-s)/2d0
       CASE (2)
-         value = (2+u-v-s)/4d0
+         value = (2+u-v-s)/2d0
       CASE (3)
-         value = (2+u+v-s)/4d0
+         value = (2+u+v-s)/2d0
       CASE (4)
-         value = (2-u+v-s)/4d0
+         value = (2-u+v-s)/2d0
       CASE (5)
          value = s
       CASE DEFAULT
@@ -3731,26 +3742,25 @@ END BLOCK
       REAL(KIND=dp) :: grad(3),s
       
       s = w/SQRT(2.0_dp)
+      grad = 0
       SELECT CASE(which)
       CASE (1)
-         grad(1) = -1/4d0
-         grad(2) = -1/4d0
-         grad(3) = -1/4d0
+         grad(1) = -1/2d0
+         grad(2) = -1/2d0
+         grad(3) = -1/2d0
       CASE (2)
-         grad(1) =  1/4d0
-         grad(2) = -1/4d0
-         grad(3) = -1/4d0
+         grad(1) =  1/2d0
+         grad(2) = -1/2d0
+         grad(3) = -1/2d0
       CASE (3)
-         grad(1) =  1/4d0
-         grad(2) =  1/4d0
-         grad(3) = -1/4d0
+         grad(1) =  1/2d0
+         grad(2) =  1/2d0
+         grad(3) = -1/2d0
       CASE (4)
-         grad(1) = -1/4d0
-         grad(2) =  1/4d0
-         grad(3) = -1/4d0
+         grad(1) = -1/2d0
+         grad(2) =  1/2d0
+         grad(3) = -1/2d0
       CASE (5)
-         grad(1) =  0
-         grad(2) =  0
          grad(3) =  1d0
       CASE DEFAULT
          CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
@@ -3771,21 +3781,21 @@ END BLOCK
       value = 0
       SELECT CASE(which)
       CASE (1)
-         value = (3d0-u-v-w)/2d0
+         value = (3-u-v-w)/2d0
       CASE (2)
-         value = (3d0+u-v-w)/2d0
+         value = (3+u-v-w)/2d0
       CASE (3)
-         value = (3d0+u+v-w)/2d0
+         value = (3+u+v-w)/2d0
       CASE (4)
-         value = (3d0-u+v-w)/2d0
+         value = (3-u+v-w)/2d0
       CASE (5)
-         value = (3d0-u-v+w)/2d0
+         value = (3-u-v+w)/2d0
       CASE (6)
-         value = (3d0+u-v+w)/2d0
+         value = (3+u-v+w)/2d0
       CASE (7)
-         value = (3d0+u+v+w)/2d0
+         value = (3+u+v+w)/2d0
       CASE (8)   
-         value = (3d0-u+v+w)/2d0
+         value = (3-u+v+w)/2d0
       CASE DEFAULT
          CALL Fatal('PElementBase::BrickL','Unknown function L for brick')
       END SELECT
@@ -4804,7 +4814,6 @@ END BLOCK
       L2 = TetraNodalPBasis(2,u,v,w)
       L3 = TetraNodalPBasis(3,u,v,w)
       L4 = TetraNodalPBasis(4,u,v,w)
-
       value = L1*L2*L3*L4*LegendreP(i,L2-L1)*LegendreP(j,2*L3-1)*LegendreP(k,2*L4-1)
     END FUNCTION TetraBubblePBasis
 
@@ -5649,6 +5658,7 @@ END BLOCK
 
       IF(n/2>1) ddh=Product2ndDerivatives(n/2,g,dg,ddg,dim,level+1)
       IF(Level==0) THEN
+        grad = 0
         DO p=1,dim
           DO q=p,dim
             grad(p,q) = ddg(1,p,q)
@@ -6427,7 +6437,7 @@ END BLOCK
     END FUNCTION ddPyramidNodalPBasis
 
 
-	
+
 !-----------------------------------------------------------------------------
 !>     Pyramid edge basis at point (u,v,w)
 !-----------------------------------------------------------------------------
@@ -6483,11 +6493,11 @@ END BLOCK
          Pa = PyramidNodalPBasis(2,u,v,w)
          Pb = PyramidNodalPBasis(3,u,v,w)
       CASE (3)
-         phiPar = -u
-         Pa = PyramidNodalPBasis(4,u,v,w)
-         Pb = PyramidNodalPBasis(3,u,v,w)
+         phiPar = u
+         Pa = PyramidNodalPBasis(3,u,v,w)
+         Pb = PyramidNodalPBasis(4,u,v,w)
       CASE (4)
-         phiPar = -v
+         phiPar = v
          Pa = PyramidNodalPBasis(1,u,v,w)
          Pb = PyramidNodalPBasis(4,u,v,w)
       CASE (5)
@@ -6581,15 +6591,15 @@ END BLOCK
          dPa = dPyramidNodalPBasis(2,u,v,w)
          dPb = dPyramidNodalPBasis(3,u,v,w)
       CASE (3)
-         phiPar = -u
-         dPhiPar(1) = -1
+         phiPar = u
+         dPhiPar(1) = 1
          Pa  = PyramidNodalPBasis(4,u,v,w)
          Pb  = PyramidNodalPBasis(3,u,v,w)
          dPa = dPyramidNodalPBasis(4,u,v,w)
          dPb = dPyramidNodalPBasis(3,u,v,w)
       CASE (4)
-         phiPar = -v
-         dPhiPar(2) = -1
+         phiPar = v
+         dPhiPar(2) = 1
          Pa  = PyramidNodalPBasis(1,u,v,w)
          Pb  = PyramidNodalPBasis(4,u,v,w)
          dPa = dPyramidNodalPBasis(1,u,v,w)
@@ -6713,17 +6723,17 @@ END BLOCK
          ddPa = ddPyramidNodalPBasis(2,u,v,w)
          ddPb = ddPyramidNodalPBasis(3,u,v,w)
       CASE (3)
-         phiPar = -u
-         dPhiPar(1) = -1
-         Pa  = PyramidNodalPBasis(4,u,v,w)
-         Pb  = PyramidNodalPBasis(3,u,v,w)
-         dPa = dPyramidNodalPBasis(4,u,v,w)
-         dPb = dPyramidNodalPBasis(3,u,v,w)
-         ddPa = ddPyramidNodalPBasis(4,u,v,w)
-         ddPb = ddPyramidNodalPBasis(3,u,v,w)
+         phiPar = u
+         dPhiPar(1) = 1
+         Pa  = PyramidNodalPBasis(3,u,v,w)
+         Pb  = PyramidNodalPBasis(4,u,v,w)
+         dPa = dPyramidNodalPBasis(3,u,v,w)
+         dPb = dPyramidNodalPBasis(4,u,v,w)
+         ddPa = ddPyramidNodalPBasis(3,u,v,w)
+         ddPb = ddPyramidNodalPBasis(4,u,v,w)
       CASE (4)
-         phiPar = -v
-         dPhiPar(2) = -1
+         phiPar = v
+         dPhiPar(2) = 1
          Pa  = PyramidNodalPBasis(1,u,v,w)
          Pb  = PyramidNodalPBasis(4,u,v,w)
          dPa = dPyramidNodalPBasis(1,u,v,w)
@@ -7008,9 +7018,9 @@ END BLOCK
 
          SELECT CASE(face)
          CASE(2)
-           La = PyramidTL(1,u,v,w)
-           Lb = PyramidTL(2,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
+           La  = PyramidTL(1,u,v,w)
+           Lb  = PyramidTL(2,u,v,w)
+           Lc  = PyramidTL(5,u,v,w)
            dLa = dPyramidTL((1),u,v,w)
            dLb = dPyramidTL((2),u,v,w)
            dLc = dPyramidTL((5),u,v,w)
@@ -7283,6 +7293,7 @@ END BLOCK
 
            ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb; ddf(3,:,:)=ddPc;
            ddf(4,:,:)=ddLegI; ddf(5,:,:)=ddLegJ
+
 
            grad = Product2ndDerivatives(5,f,df,ddf,3,0)
          END BLOCK

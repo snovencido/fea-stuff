@@ -3445,10 +3445,9 @@ CONTAINS
                     q = q + 1
 
                     Basis(q) = TetraBubblePBasis(i,j,k,u,v,w)
-                    dLBasisdx(q,1:3) = dTetraBubblePBasis(i,j,k,u,v,w)
-
+                    dLBasisdx(q,:) = dTetraBubblePBasis(i,j,k,u,v,w)
                     IF(Compute2ndDerivatives) THEN
-                      ddLBasisddx(q,1:3,1:3) = ddTetraBubblePBasis(i,j,k,u,v,w)
+                      ddLBasisddx(q,:,:) = ddTetraBubblePBasis(i,j,k,u,v,w)
                     END IF
                     ! Polynomial degree of basis function to vector
                     IF (degrees) BasisDegree(q) = 4+i+j+k
@@ -3487,11 +3486,10 @@ CONTAINS
 
                  ! Get values of edge basis functions and their derivatives
                  Basis(q) = PyramidEdgePBasis(i,k+1,u,v,w,invert)
-                 dLBasisdx(q,1:3) = dPyramidEdgePBasis(i,k+1,u,v,w,invert)
+                 dLBasisdx(q,:) = dPyramidEdgePBasis(i,k+1,u,v,w,invert)
                  IF (Compute2ndDerivatives) THEN
-                   ddLBasisddx(q,1:3,1:3) = ddPyramidEdgePBasis(i,k+1,u,v,w,invert)
+                   ddLBasisddx(q,:,:) = ddPyramidEdgePBasis(i,k+1,u,v,w,invert)
                  END IF
-
                  ! Polynomial degree of basis function to vector
                  IF (degrees) BasisDegree(q) = 1+k
               END DO
@@ -3529,7 +3527,7 @@ CONTAINS
                        Basis(q) = PyramidFacePBasis(F,i,j,u,v,w,direction)
                        dLBasisdx(q,:) = dPyramidFacePBasis(F,i,j,u,v,w,direction)
                        IF (Compute2ndDerivatives) THEN
-                         ddLBasisddx(q,1:3,1:3) = ddPyramidFacePBasis(F,i,j,u,v,w,direction)
+                         ddLBasisddx(q,:,:) = ddPyramidFacePBasis(F,i,j,u,v,w,direction)
                        END IF
                        
                        ! Polynomial degree of basis function to vector
@@ -3553,7 +3551,7 @@ CONTAINS
                        Basis(q) = PyramidFacePBasis(F,i,j,u,v,w,direction)
                        dLBasisdx(q,:) = dPyramidFacePBasis(F,i,j,u,v,w,direction)
                        IF (Compute2ndDerivatives) THEN
-                         ddLBasisddx(q,1:3,1:3) = ddPyramidFacePBasis(F,i,j,u,v,w,direction)
+                         ddLBasisddx(q,:,:) = ddPyramidFacePBasis(F,i,j,u,v,w,direction)
                        END IF
 
                        ! Polynomial degree of basis function to vector
@@ -3838,7 +3836,7 @@ CONTAINS
                       Basis(q) = BrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       dLBasisdx(q,:) = dBrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       IF (Compute2ndDerivatives) THEN
-                        ddLBasisddx(q,1:3,1:3) = ddBrickPyraFacePBasis(F,i,j,u,v,w,direction)
+                        ddLBasisddx(q,:,:) = ddBrickPyraFacePBasis(F,i,j,u,v,w,direction)
                       END IF
                       ! Polynomial degree of basis function to vector
                       IF (degrees) BasisDegree(q) = i+j
@@ -3855,7 +3853,7 @@ CONTAINS
                       Basis(q) = BrickFacePBasis(F,i,j,u,v,w,direction)
                       dLBasisdx(q,:) = dBrickFacePBasis(F,i,j,u,v,w,direction)
                       IF (Compute2ndDerivatives) THEN
-                        ddLBasisddx(q,1:3,1:3) = ddBrickFacePBasis(F,i,j,u,v,w,direction)
+                        ddLBasisddx(q,:,:) = ddBrickFacePBasis(F,i,j,u,v,w,direction)
                       END IF
                       ! Polynomial degree of basis function to vector
                       IF (degrees) BasisDegree(q) = i+j
@@ -3887,7 +3885,7 @@ CONTAINS
                       Basis(q) = BrickPyraBubblePBasis(i,j,k,u,v,w)
                       dLBasisdx(q,:) = dBrickPyraBubblePBasis(i,j,k,u,v,w)
                       IF (Compute2ndDerivatives) THEN
-                        ddLBasisddx(q,1:3,1:3) = ddBrickPyraBubblePBasis(i,j,k,u,v,w)
+                        ddLBasisddx(q,:,:) = ddBrickPyraBubblePBasis(i,j,k,u,v,w)
                       END IF
                     
                       ! Polynomial degree of basis function to vector
@@ -3906,7 +3904,7 @@ CONTAINS
                      Basis(q) = BrickBubblePBasis(i,j,k,u,v,w)
                      dLBasisdx(q,:) = dBrickBubblePBasis(i,j,k,u,v,w)
                      IF (Compute2ndDerivatives) THEN
-                       ddLBasisddx(q,1:3,1:3) = ddBrickBubblePBasis(i,j,k,u,v,w)
+                       ddLBasisddx(q,:,:) = ddBrickBubblePBasis(i,j,k,u,v,w)
                      END IF
                      ! Polynomial degree of basis function to vector
                      IF (degrees) BasisDegree(q) = i+j+k
@@ -13833,7 +13831,6 @@ END FUNCTION PointFaceDistance
     INTEGER :: globalDir(3)      !< Global direction of triangular face as local node numbers.
 !------------------------------------------------------------------------------
     INTEGER :: i, nodes(3)  
-    nodes = 0
     
     ! Put global nodes of face into sorted order
     nodes(1:3) = Indexes( FaceMap )
