@@ -2200,7 +2200,7 @@ MODULE PElementBase
       Pb   = BrickNodalPBasis(local(2),u,v,w)
 
       dPa  = dBrickNodalPBasis(local(1),u,v,w)
-      dPa  = dBrickNodalPBasis(local(2),u,v,w)
+      dPb  = dBrickNodalPBasis(local(2),u,v,w)
 
       ddPa = ddBrickNodalPBasis(local(1),u,v,w)
       ddPb = ddBrickNodalPBasis(local(2),u,v,w)
@@ -2607,8 +2607,15 @@ MODULE PElementBase
 
       grad=0
       grad(1,1) = ddPhi(i+2,u)*Phi(j+2,v)*Phi(k+2,w)
+      grad(1,2) = dPhi(i+2,u)*dPhi(j+2,v)*Phi(k+2,w)
+      grad(1,3) = dPhi(i+2,u)*Phi(j+2,v)*dPhi(k+2,w)
       grad(2,2) = Phi(i+2,u)*ddPhi(j+2,v)*Phi(k+2,w)
+      grad(2,3) = Phi(i+2,u)*dPhi(j+2,v)*dPhi(k+2,w)
       grad(3,3) = Phi(i+2,u)*Phi(j+2,v)*ddPhi(k+2,w)
+
+      grad(2,1) = grad(1,2)
+      grad(3,1) = grad(1,3)
+      grad(3,2) = grad(2,3)
     END FUNCTION ddBrickBubblePBasis
 
 
