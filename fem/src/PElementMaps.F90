@@ -801,7 +801,7 @@ CONTAINS
        faceDOFs = (p-1)*(p-2)/2
     ! Tetrahedron
     CASE (4)
-       faceDOFs = (p-1)*p/2
+       faceDOFs = (p-1)**2 ! (p-1)*p/2
     ! Tetrahedron
     CASE (5)
        faceDOFs = (p-1)*(p-2)/2
@@ -809,7 +809,7 @@ CONTAINS
     CASE (6)
        SELECT CASE(faceNumber)
         CASE (1)
-          faceDOFs = (p-1)*p/2
+          faceDOFs = (p-1)**2 ! (p-1)*p/2
         CASE (2:5)
           faceDOFs = (p-1)*(p-2)/2
        END SELECT
@@ -819,11 +819,11 @@ CONTAINS
        CASE (1,2)
           faceDOFs = (p-1)*(p-2)/2
        CASE (3:5)
-          faceDOFs = (p-1)*p/2
+          faceDOFs = (p-1)**2 ! (p-1)*p/2
        END SELECT
     ! Brick   
     CASE (8)
-       faceDOFs = (p-1)*p/2
+       faceDOFs = (p-1)**2 ! (p-1)*p/2
     CASE DEFAULT
       WRITE(Message,'(A,I0)') 'Unsupported p element type: ',Element % TYPE % ElementCode
       CALL Warn('PElementMaps::getFaceDOFs',Message)
@@ -879,17 +879,19 @@ CONTAINS
       BubbleDOFs = (p-2)*(p-1)/2
     ! Quad
     CASE (4)
-      BubbleDOFs = (p-1)*p/2
+      BubbleDOFs = (p-1)**2 ! (p-1)*p/2
     ! Tetrahedron
     CASE (5)
       BubbleDOFs = (p-3)*(p-2)*(p-1)/6
-    ! Pyramid, prism & hexa
+    ! Pyramid
     CASE (6)
        BubbleDOFs = (p-2)*(p-1)*p/6
+    ! Prism
     CASE (7)
        BubbleDOFs = (p-1)*(p)*(p+1)/6
+    ! Hexa
     CASE (8)
-       BubbleDOFs = (p-1)*(p)*(p+1)/6
+       BubbleDOFs = (p-1)**3 ! (p-1)*(p)*(p+1)/6
     CASE DEFAULT
        CALL Warn('PElementMaps::getBubbleDOFs','Unsupported p element type')
        bubbleDOFs = p

@@ -3304,7 +3304,7 @@ CONTAINS
            ! For each bubble calculate the value of p basis function
            ! and its derivatives for index pairs i,j>=2, i+j=4,...,p
            bubbles_quad: DO i=0,p-2
-              DO j=0,p-i-2
+              DO j=0,p-2
                  IF ( q >= SIZE(Basis) ) EXIT bubbles_quad
                  q = q + 1
                  
@@ -3490,8 +3490,10 @@ CONTAINS
                  ! For each face calculate the values of functions for index
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
 
+!                DO i=0,p-2
+!                   DO j=0,p-i-2
                  DO i=0,p-2
-                    DO j=0,p-i-2
+                    DO j=0,p-2
                        IF ( q >= SIZE(Basis) ) EXIT faces_pyramid
                        q = q + 1
                        
@@ -3655,8 +3657,10 @@ CONTAINS
 
                  ! For each face calculate values of functions from index
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
+!                DO i=0,p-2
+!                   DO j=0,p-i-2
                  DO i=0,p-2
-                    DO j=0,p-i-2
+                    DO j=0,p-2
                        IF ( q >= SIZE(Basis) ) EXIT faces_prism
                        q = q + 1
 
@@ -3685,8 +3689,10 @@ CONTAINS
            ! For each bubble calculate the value of basis function and its derivative
            ! for index pairs i,j=0,..,p-5 k=2,..,p-3 i+j+k=2,..,p-3
            bubbles_prism: DO i=0,p-2
-              DO j=0,p-i-2
-                 DO k=0,p-i-j-2
+!             DO j=0,p-i-2
+!                DO k=0,p-i-j-2
+              DO j=0,p-2
+                 DO k=0,p-2
                     IF ( q >= SIZE(Basis) ) EXIT bubbles_prism
                     q = q + 1
 
@@ -3764,8 +3770,10 @@ CONTAINS
                 ! pairs i,j=2,..,p-2 i+j=4,..,p
 !               DO i=2,p-2
 !                  DO j=2,p-i
+!                DO i=0,p-2
+!                   DO j=0,p-i-2
                  DO i=0,p-2
-                    DO j=0,p-i-2
+                    DO j=0,p-2
                       IF ( q >= SIZE(Basis) ) EXIT faces_brick
 
                       q = q + 1
@@ -3789,8 +3797,10 @@ CONTAINS
           p = getEffectiveBubbleP(element,p,bdofs)
 
           bubbles_brick: DO i=0,p-2
-             DO j=0,p-i-2
-                DO k=0,p-i-j-2
+!            DO j=0,p-0-2
+!               DO k=0,p-i-j-2
+             DO j=0,p-2
+                DO k=0,p-2
                    IF ( q >= SIZE(Basis)) EXIT bubbles_brick
                    q = q + 1
 
