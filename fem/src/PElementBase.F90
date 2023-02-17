@@ -2267,7 +2267,7 @@ MODULE PElementBase
         df(3,:) = dVphi
         ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb; ddf(3,:,:)=ddVphi 
 
-        grad = Product2ndDerivatives(2,f,df,ddf,3,0)
+        grad = Product2ndDerivatives(3,f,df,ddf,3,0)
       END BLOCK
 #endif
 
