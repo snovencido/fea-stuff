@@ -18009,6 +18009,7 @@ CONTAINS
             END DO
 
             ! Mark edge as an edge of pydamid square face 
+ !          IF (isPBrick(Element)) THEN
             IF (isPPyramid(Element) ) THEN
               Faces(Face) % PDefs % pyramidQuad = .TRUE.
             END IF
@@ -18350,6 +18351,7 @@ CONTAINS
           Element % EdgeIndexes(k) = Edge
           
           ! Mark edge as an edge of pydamid square face 
+!         IF (isPBrick(Element)) THEN
           IF (isPPyramid(Element) .AND. k < 5) THEN
             Edges(Edge) % PDefs % pyramidQuad = .TRUE.
           END IF

@@ -798,40 +798,32 @@ CONTAINS
     SELECT CASE(Element % TYPE % ElementCode / 100)
     ! Quad
     CASE (3)
-       IF (p >= 3) faceDOFs = (p-1)*(p-2)/2
+       faceDOFs = (p-1)*(p-2)/2
     ! Tetrahedron
     CASE (4)
-       IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+       faceDOFs = (p-1)*p/2
     ! Tetrahedron
     CASE (5)
-       IF (p >= 3) faceDOFs = (p-1)*(p-2)/2
+       faceDOFs = (p-1)*(p-2)/2
     ! Pyramid
     CASE (6)
        SELECT CASE(faceNumber)
-          CASE (1)
-             IF (p >= 2) faceDOFs = (p-1)*p/2
-          CASE (2:5)
-             IF (p >= 3) faceDOFs = (p-1)*(p-2)/2
+        CASE (1)
+          faceDOFs = (p-1)*p/2
+        CASE (2:5)
+          faceDOFs = (p-1)*(p-2)/2
        END SELECT
     ! Wedge
     CASE (7)
        SELECT CASE(faceNumber)
        CASE (1,2)
-          IF (p >= 3) faceDOFs = (p-1)*(p-2)/2
+          faceDOFs = (p-1)*(p-2)/2
        CASE (3:5)
-          IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
+          faceDOFs = (p-1)*p/2
        END SELECT
     ! Brick   
     CASE (8)
-       IF (PRESENT(Face)) THEN
-         IF(Face % PDefs % pyramidQuad) THEN
-           IF (p >= 2) faceDOFs = (p-1)*p/2
-         ELSE
-           IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
-         END IF
-       ELSE
-         IF (p >= 4) faceDOFs = (p-2)*(p-3)/2
-       END IF
+       faceDOFs = (p-1)*p/2
     CASE DEFAULT
       WRITE(Message,'(A,I0)') 'Unsupported p element type: ',Element % TYPE % ElementCode
       CALL Warn('PElementMaps::getFaceDOFs',Message)
@@ -881,37 +873,23 @@ CONTAINS
     SELECT CASE (Element % TYPE % ElementCode / 100)
     ! Line 
     CASE (2)
-      IF (p >= 2) bubbleDOFs = p - 1
+      BubbleDOFs = p-1
     ! Triangle
     CASE (3)
-      IF (p >= 3) bubbleDOFs = (p-1)*(p-2)/2
+      BubbleDOFs = (p-2)*(p-1)/2
     ! Quad
     CASE (4)
-       IF (p >= 4) bubbleDOFs = (p-2)*(p-3)/2
+      BubbleDOFs = (p-1)*p/2
     ! Tetrahedron
     CASE (5)
-       IF (p >= 4) bubbleDOFs = (p-1)*(p-2)*(p-3)/6
-    ! Pyramid
+      BubbleDOFs = (p-3)*(p-2)*(p-1)/6
+    ! Pyramid, prism & hexa
     CASE (6)
-       IF (p >= 3) THEN
-         DO i=0,p-3
-           bubbleDOFs = BubbleDOFs + (i+1)*(i+2)/2
-         END DO
-       END IF
-    ! Wedge
+       BubbleDOFs = (p-2)*(p-1)*p/6
     CASE (7)
-       IF (p >= 5) bubbleDOFs = (p-2)*(p-3)*(p-4)/6
-    ! Brick
+       BubbleDOFs = (p-1)*(p)*(p+1)/6
     CASE (8)
-       IF (Element % PDefs % PyramidQuad) THEN
-         IF (p >= 3 ) THEN
-           DO i=0,p-3
-             bubbleDOFs = BubbleDOFs + (i+1)*(i+2)/2
-           END DO
-         END IF
-       ELSE
-         IF (p >= 6) bubbleDOFs = (p-3)*(p-4)*(p-5)/6
-       END IF
+       BubbleDOFs = (p-1)*(p)*(p+1)/6
     CASE DEFAULT
        CALL Warn('PElementMaps::getBubbleDOFs','Unsupported p element type')
        bubbleDOFs = p
@@ -1167,6 +1145,29 @@ CONTAINS
 !------------------------------------------------------------------------------
 
 !------------------------------------------------------------------------------
+  FUNCTION getEffectiveBubbleP(Element,set_p,bdofs) RESULT(p)
+!------------------------------------------------------------------------------
+     IMPLICIT NONE
+
+     INTEGER :: p, bdofs, set_p
+     TYPE(Element_t) :: Element
+
+     INTEGER :: curr_nb, nb
+
+     p = set_p
+     curr_nb = GetBubbleDOFs(Element,p)
+     nb = MAX( curr_nb, bdofs )
+
+     DO WHILE(curr_nb < nb)
+       p = p + 1
+       curr_nb = GetBubbleDOFs(Element,p)
+     END DO
+!------------------------------------------------------------------------------
+  END FUNCTION getEffectiveBubbleP
+!------------------------------------------------------------------------------
+
+
+!------------------------------------------------------------------------------
 !> Get the number of Gauss points for P-elements.
 !------------------------------------------------------------------------------
     FUNCTION getNumberOfGaussPoints( Element, Mesh ) RESULT(ngp)
@@ -1176,7 +1177,7 @@ CONTAINS
       TYPE(Element_t) :: Element
       INTEGER :: ngp
 !------------------------------------------------------------------------------
-      INTEGER :: edgeP, faceP, bubbleP, TrueBubbleP, nb, maxp
+      INTEGER :: edgeP, faceP, bubbleP, TrueBubbleP, maxp
 
       IF (.NOT. ASSOCIATED(Element % PDefs)) THEN
          CALL Warn('PElementMaps::getNumberOfGaussPoints','Element not p element')
@@ -1198,54 +1199,20 @@ CONTAINS
       END IF
       
       ! Element bubble p
-      bubbleP = 0
-      TrueBubbleP = 0
-      IF (Element % BDOFs > 0) THEN
-         bubbleP = Element % PDefs % P
-         
-         SELECT CASE( Element % TYPE % ElementCode / 100 )
-         CASE(3)
-             nb = MAX( GetBubbleDOFs( Element, bubbleP ), Element % BDOFs )
-             bubbleP = CEILING( ( 3.0d0+SQRT(1.0d0+8.0d0*nb) ) / 2.0d0 - AEPS)
-
-         CASE(4)
-             nb = MAX( GetBubbleDOFs( Element, bubbleP ), Element % BDOFs )
-             TrueBubbleP = CEILING( ( 5.0d0+SQRT(1.0d0+8.0d0*nb) ) / 2.0d0 - AEPS )
-             bubbleP = TrueBubbleP - 2
-
-         CASE(5)
-             nb = MAX( GetBubbleDOFs(Element, bubbleP ), Element % BDOFs )
-             bubbleP = CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0 / &
-                    (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+2 - AEPS)
-
-         CASE(6)
-             nb = MAX( GetBubbleDOFs(Element, bubbleP ), Element % BDOFs )
-             bubbleP = CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0 / &
-                    (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+2 - AEPS) - 1
-
-         CASE(7)
-             nb = MAX( GetBubbleDOFs( Element, bubbleP ), Element % BDOFs )
-             bubbleP = CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0 / &
-                    (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+3 - AEPS) - 2
-
-         CASE(8)
-             nb = MAX( GetBubbleDOFs(Element, bubbleP ), Element % BDOFs )
-             bubbleP = CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0 / &
-                    (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+4 - AEPS) - 4
-         END SELECT
-      END IF
+      bubbleP = getEffectiveBubbleP(Element,Element % PDefs % P,Element % bdofs)
+      TrueBubbleP = bubbleP
 
       ! Special quadrature may be available: 
       IF (Element % TYPE % ElementCode / 100 == 4) THEN
         ! The true polynomial degree is as follows
-        maxp = MAX(1, edgeP, faceP, TrueBubbleP)
+        !maxp = MAX(1, edgeP, faceP, TrueBubbleP)
         ! but this would replace the true bubble degree by a tampered value:
-        !maxp = MAX(1, edgeP, faceP, BubbleP)
+        maxp = MAX(1, edgeP, faceP, BubbleP)
 
         ! Economic quadratures cannot be used if an explicit bubble augmentation is used
         ! with lower-order finite elements:
         IF ( .NOT.(Element % PDefs % P < 4 .AND. Element % BDOFs>0) ) THEN
-          IF (maxp > 1 .AND. maxp <= 8) THEN
+          IF (maxp > 1 .AND. maxp <= 7) THEN
             !PRINT *, 'SETTING SPECIAL NGP'
             !PRINT *, 'MAXP=',MAXP
             SELECT CASE(maxp)
@@ -1254,14 +1221,12 @@ CONTAINS
             CASE(3)
               ngp = 12
             CASE(4)
-              ngp = 20
+              ngp = 25
             CASE(5)
               ngp = 36
             CASE(6)
               ngp = 45
             CASE(7)
-              ngp = 60
-            CASE(8)
               ngp = 60
             END SELECT
             RETURN

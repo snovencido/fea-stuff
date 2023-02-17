@@ -2647,7 +2647,7 @@ CONTAINS
        IF (pElement .AND. ASSOCIATED( elm % pdefs ) ) THEN
          Economic = .FALSE.
          ! For certain polynomial orders, economic quadratures may be used:
-         IF (elm % PDefs % P > 1 .AND.  elm % PDefs % P <= 8) Economic = .TRUE.
+         IF (elm % PDefs % P > 1 .AND.  elm % PDefs % P <= 7) Economic = .TRUE.
          ! An explicit bubble augmentation with lower-order methods switches to
          ! the standard rule:
          IF (elm % BDOFs > 0 .AND. elm % PDefs % P < 4) Economic = .FALSE.
