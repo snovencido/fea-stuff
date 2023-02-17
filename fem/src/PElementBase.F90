@@ -2193,7 +2193,7 @@ MODULE PElementBase
       END IF
 
       ! Get local of edge
-      local(1:2) = getBrickEdgeMap(edge)
+      local = getBrickEdgeMap(edge)
 
       ! Trilinear nodal functions and their derivatives
       Pa   = BrickNodalPBasis(local(1),u,v,w)
@@ -2267,7 +2267,7 @@ MODULE PElementBase
         df(3,:) = dVphi
         ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb; ddf(3,:,:)=ddVphi 
 
-        grad = Product2ndDerivatives(3,f,df,ddf,3,0)
+        grad = Product2ndDerivatives(2,f,df,ddf,3,0)
       END BLOCK
 #endif
 
@@ -2539,11 +2539,9 @@ MODULE PElementBase
       INTEGER, INTENT(IN) :: i, j, k
       REAL (KIND=dp), INTENT(IN) :: u, v, w
       ! Result
-      REAL (KIND=dp) :: value, Pa,Pb,s
+      REAL (KIND=dp) :: value
 
-      Pa = BrickNodalPBasis(1,u,v,w)
-      Pb = BrickNodalPBasis(7,u,v,w)
-      value = Pa*Pb*LegendreP(i,u)*LegendreP(j,v)*LegendreP(k,w)
+      value=Phi(i+2,u)*Phi(j+2,v)*Phi(k+2,w)
     END FUNCTION BrickBubblePBasis
 
 
@@ -2572,24 +2570,11 @@ MODULE PElementBase
       INTEGER, INTENT(IN) :: i, j, k
       REAL (KIND=dp), INTENT(IN) :: u, v, w
       ! Result
-      REAL (KIND=dp) :: grad(3),s,Pa,Pb,Lu,Lv,Lw,dPa(3),dPb(3),dLu(3),dLv(3),dLw(3)
+      REAL (KIND=dp) :: grad(3)
 
-      Pa  = BrickNodalPBasis(1,u,v,w)
-      Pb  = BrickNodalPBasis(7,u,v,w)
-      dPa = dBrickNodalPBasis(1,u,v,w)
-      dPb = dBrickNodalPBasis(7,u,v,w)
-
-      Lu = LegendreP(i,u)
-      Lv = LegendreP(j,v)
-      Lw = LegendreP(k,w)
-
-      dLu=0; dLv=0; dLw=0
-      dLu(1) = dLegendreP(i,u)
-      dLv(2) = dLegendreP(j,v)
-      dLw(3) = dLegendreP(k,w)
-
-      grad = dPa*Pb*Lu*Lv*Lw + Pa*dPb*Lu*Lv*Lw + Pa*Pb*dLu*Lv*Lw + &
-             Pa*Pb*Lu*dLv*Lw + Pa*Pb*Lu*Lv*dLw
+      grad(1) = dPhi(i+2,u)*Phi(j+2,v)*Phi(k+2,w)
+      grad(2) = Phi(i+2,u)*dPhi(j+2,v)*Phi(k+2,w)
+      grad(3) = Phi(i+2,u)*Phi(j+2,v)*dPhi(k+2,w)
     END FUNCTION dBrickBubblePBasis
 !------------------------------------------------------------------------------
 
@@ -2616,52 +2601,14 @@ MODULE PElementBase
       
       ! Parameters 
       INTEGER, INTENT(IN) :: i, j, k
-      REAL (KIND=dp), INTENT(IN) :: u, v, w
+      REAL(KIND=dp), INTENT(IN) :: u, v, w
       ! Result
-      REAL (KIND=dp) :: grad(3,3)
+      REAL(KIND=dp) :: grad(3,3)
 
-      REAL(KIND=dp) :: Pa,Pb,Lu,Lv,Lw,dPa(3),dPb(3),dLu(3),dLv(3),dLw(3)
-      REAL(KIND=dp) :: ddLu(3,3),ddLv(3,3),ddLw(3,3),ddPa(3,3),ddPb(3,3)
-
-      Pa  = BrickNodalPBasis(1,u,v,w)
-      Pb  = BrickNodalPBasis(7,u,v,w)
-
-      dPa = dBrickNodalPBasis(1,u,v,w)
-      dPb = dBrickNodalPBasis(7,u,v,w)
-
-      ddPa = ddBrickNodalPBasis(1,u,v,w)
-      ddPb = ddBrickNodalPBasis(7,u,v,w)
-
-      Lu = LegendreP(i,u)
-      Lv = LegendreP(j,v)
-      Lw = LegendreP(k,w)
-
-      dLu=0; dLv=0; dLw=0
-      dLu(1) = dLegendreP(i,u)
-      dLv(2) = dLegendreP(j,v)
-      dLw(3) = dLegendreP(k,w)
-
-      ddLu=0; ddLv=0; ddLw=0
-      ddLu(1,1) = ddLegendreP(i,u)
-      ddLv(2,2) = ddLegendreP(j,v)
-      ddLw(3,3) = ddLegendreP(k,w)
-
-!     grad=dPa*Pb*Lu*Lv*Lw + Pa*dPb*Lu*Lv*Lw + Pa*Pb*dLu*Lv*Lw + &
-!          Pa*Pb*Lu*dLv*Lw + Pa*Pb*Lu*Lv*dLw
-      BLOCK
-        REAL(KIND=dp) :: f(5), df(5,3), ddf(5,3,3)
-
-        f=[Pa, Pb, Lu, Lv, Lw]
-        df(1,:)=dPa; df(2,:)=dPb;
-        df(3,:)=dLu; df(4,:)=dLv; df(5,:)=dLw
-        ddf(1,:,:)=ddPa; ddf(2,:,:)=ddPb;
-        ddf(3,:,:)=ddLu; ddf(4,:,:)=ddLv; ddf(5,:,:)=ddLw
-
-        grad = Product2ndDerivatives(5,f,df,ddf,3,0)
-      END BLOCK
-      grad(2,1) = grad(1,2)
-      grad(3,1) = grad(1,3)
-      grad(3,2) = grad(2,3)
+      grad=0
+      grad(1,1) = ddPhi(i+2,u)*Phi(j+2,v)*Phi(k+2,w)
+      grad(2,2) = Phi(i+2,u)*ddPhi(j+2,v)*Phi(k+2,w)
+      grad(3,3) = Phi(i+2,u)*Phi(j+2,v)*ddPhi(k+2,w)
     END FUNCTION ddBrickBubblePBasis
 
 
