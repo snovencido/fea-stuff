@@ -3651,8 +3651,8 @@ CONTAINS
                  IF (.NOT. wedgeOrdering(direction)) THEN
                     invert = .TRUE.
                     tmp(1) = direction(2)
-                    direction(4) = tmp(1)
                     direction(2) = direction(4)
+                    direction(4) = tmp(1)
                  END IF
 
                  ! For each face calculate values of functions from index
