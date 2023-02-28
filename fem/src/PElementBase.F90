@@ -946,13 +946,13 @@ MODULE PElementBase
 
       SELECT CASE (which)
       CASE (1)
-         value = (2d0-u-v)/2d0
+         value = (2-u-v)/2
       CASE (2)
-         value = (2d0+u-v)/2d0
+         value = (2+u-v)/2
       CASE (3)
-         value = (2d0+u+v)/2d0
+         value = (2+u+v)/2
       CASE (4)
-         value = (2d0-u+v)/2d0
+         value = (2-u+v)/2
       CASE DEFAULT
          value = 0.0_dp
          CALL Fatal('PElementBase::QuadL', 'Unknown helper function L for quad')
@@ -1030,9 +1030,9 @@ MODULE PElementBase
       value = 0
       SELECT CASE(node)
       CASE (1)
-         value = 1d0/2*(1-u-v/SQRT(3d0))
+         value = (1-u-v/SQRT(3d0))/2
       CASE (2)
-         value = 1d0/2*(1+u-v/SQRT(3d0))
+         value = (1+u-v/SQRT(3d0))/2
       CASE (3)
          value = v/SQRT(3d0)
       CASE DEFAULT
@@ -2232,17 +2232,17 @@ MODULE PElementBase
       END DO
 
 !     grad(1) = dPa(1)*Pb*vPhi + Pa*dPb(1)*vPhi + Pa*Pb*dvPhi(1)
-#if 0
+#if 1
       grad = 0
       grad(1,1) = grad(1,1) + ddPa(1,1)*Pb*vPhi + dPa(1)*dPb(1)*vPhi + dPa(1)*Pb*dvPhi(1)
       grad(1,1) = grad(1,1) + dPa(1)*dPb(1)*vPhi + Pa*ddPb(1,1)*vPhi + Pa*dPb(1)*dvPhi(1)
       grad(1,1) = grad(1,1) + dPa(1)*Pb*dvPhi(1) + Pa*dPb(1)*dvPhi(1) + Pa*Pb*ddvPhi(1,1)
 
-      grad(1,2) = grad(1,2) + ddPa(1,2)*Pb*vPhi + dPa(1)*dPb(2)*vPhi + dPa(1)*Pb*dvPhi(1)
+      grad(1,2) = grad(1,2) + ddPa(1,2)*Pb*vPhi + dPa(2)*dPb(1)*vPhi + dPa(2)*Pb*dvPhi(1)
       grad(1,2) = grad(1,2) + dPa(1)*dPb(2)*vPhi + Pa*ddPb(1,2)*vPhi + Pa*dPb(2)*dvPhi(1)
       grad(1,2) = grad(1,2) + dPa(1)*Pb*dvPhi(2) + Pa*dPb(1)*dvPhi(2) + Pa*Pb*ddvPhi(1,2)
 
-      grad(1,3) = grad(1,3) + ddPa(1,3)*Pb*vPhi + dPa(1)*dPb(3)*vPhi + dPa(1)*Pb*dvPhi(1)
+      grad(1,3) = grad(1,3) + ddPa(1,3)*Pb*vPhi + dPa(3)*dPb(1)*vPhi + dPa(3)*Pb*dvPhi(1)
       grad(1,3) = grad(1,3) + dPa(1)*dPb(3)*vPhi + Pa*ddPb(1,3)*vPhi + Pa*dPb(3)*dvPhi(1)
       grad(1,3) = grad(1,3) + dPa(1)*Pb*dvPhi(3) + Pa*dPb(1)*dvPhi(3) + Pa*Pb*ddvPhi(1,3)
 
@@ -2250,7 +2250,7 @@ MODULE PElementBase
       grad(2,2) = grad(2,2) + dPa(2)*dPb(2)*vPhi + Pa*ddPb(2,2)*vPhi + Pa*dPb(2)*dvPhi(2)
       grad(2,2) = grad(2,2) + dPa(2)*Pb*dvPhi(2) + Pa*dPb(2)*dvPhi(2) + Pa*Pb*ddvPhi(2,2)
 
-      grad(2,3) = grad(2,3) + ddPa(2,3)*Pb*vPhi + dPa(2)*dPb(3)*vPhi + dPa(2)*Pb*dvPhi(2)
+      grad(2,3) = grad(2,3) + ddPa(2,3)*Pb*vPhi + dPa(3)*dPb(2)*vPhi + dPa(3)*Pb*dvPhi(2)
       grad(2,3) = grad(2,3) + dPa(2)*dPb(3)*vPhi + Pa*ddPb(2,3)*vPhi + Pa*dPb(3)*dvPhi(2)
       grad(2,3) = grad(2,3) + dPa(2)*Pb*dvPhi(3) + Pa*dPb(2)*dvPhi(3) + Pa*Pb*ddvPhi(2,3)
 
@@ -6285,13 +6285,13 @@ MODULE PElementBase
 
       SELECT CASE (which)
       CASE (1)
-         grad = [ -1d0/2,-1d0/2,0d0 ]
+         grad = [-1d0/2,-1d0/2,0d0 ]
       CASE (2)
          grad = [ 1d0/2,-1d0/2,0d0 ]
       CASE (3)
-         grad = [ 1d0/2,1d0/2,0d0 ]
+         grad = [ 1d0/2, 1d0/2,0d0 ]
       CASE (4)
-         grad = [ -1d0/2,1d0/2,0d0 ]
+         grad = [-1d0/2, 1d0/2,0d0 ]
       CASE DEFAULT
          CALL Fatal('PElementBase::dPyramidL','Unknown affine coordinate for square face')
       END SELECT
@@ -6311,13 +6311,13 @@ MODULE PElementBase
       s = w/SQRT(2.0_dp)
       SELECT CASE(which)
       CASE (1)
-         value = (2-u-v-s)/2d0
+         value = (2-u-v-s)/2
       CASE (2)
-         value = (2+u-v-s)/2d0
+         value = (2+u-v-s)/2
       CASE (3)
-         value = (2+u+v-s)/2d0
+         value = (2+u+v-s)/2
       CASE (4)
-         value = (2-u+v-s)/2d0
+         value = (2-u+v-s)/2
       CASE (5)
          value = s
       CASE DEFAULT
@@ -6338,26 +6338,27 @@ MODULE PElementBase
       grad = 0
       SELECT CASE(which)
       CASE (1)
-         grad(1) = -1/2d0
-         grad(2) = -1/2d0
-         grad(3) = -1/2d0
+         grad(1) = -1
+         grad(2) = -1
+         grad(3) = -1
       CASE (2)
-         grad(1) =  1/2d0
-         grad(2) = -1/2d0
-         grad(3) = -1/2d0
+         grad(1) =  1
+         grad(2) = -1
+         grad(3) = -1
       CASE (3)
-         grad(1) =  1/2d0
-         grad(2) =  1/2d0
-         grad(3) = -1/2d0
+         grad(1) =  1
+         grad(2) =  1
+         grad(3) = -1
       CASE (4)
-         grad(1) = -1/2d0
-         grad(2) =  1/2d0
-         grad(3) = -1/2d0
+         grad(1) = -1
+         grad(2) =  1
+         grad(3) = -1
       CASE (5)
-         grad(3) =  1d0
+         grad(3) =  2
       CASE DEFAULT
          CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
       END SELECT
+      grad = grad/2
       grad(3) = grad(3)/SQRT(2._dp)
     END FUNCTION dPyramidTL
 
@@ -7398,7 +7399,7 @@ MODULE PElementBase
     END FUNCTION ddLegendreP
 
     ! Function value = x^n
-    FUNCTION toExp(x,n) RESULT(value)
+    PURE FUNCTION toExp(x,n) RESULT(value)
       IMPLICIT NONE
       
       REAL(KIND=dp), INTENT(IN) :: x
