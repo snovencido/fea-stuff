@@ -5319,54 +5319,31 @@ MODULE PElementBase
       REAL(KIND=dp), INTENT(IN) :: u,v,w
       LOGICAL, INTENT(IN), OPTIONAL :: invertEdge
       ! Variables
+      INTEGER :: local(2)
       LOGICAL :: invert
-      REAL(KIND=dp) :: Pa, Pb, phiPar, value, s, sq2=SQRT(2.0_dp)
+      REAL(KIND=dp) :: La, Lb, Pa, Pb, phiPar, value, s, sq2=SQRT(2.0_dp)
             
       ! Edge is not inverted by default
       invert = .FALSE.
       IF (PRESENT(invertEdge)) invert = invertEdge
 
-      ! Set parameters
-      value = 0
-      s = w/sq2
-      SELECT CASE(edge)
-      CASE (1)
-         phiPar = u
-         Pa = PyramidNodalPBasis(1,u,v,w)
-         Pb = PyramidNodalPBasis(2,u,v,w)
-      CASE (2)
-         phiPar = v
-         Pa = PyramidNodalPBasis(2,u,v,w)
-         Pb = PyramidNodalPBasis(3,u,v,w)
-      CASE (3)
-         phiPar = u
-         Pa = PyramidNodalPBasis(3,u,v,w)
-         Pb = PyramidNodalPBasis(4,u,v,w)
-      CASE (4)
-         phiPar = v
-         Pa = PyramidNodalPBasis(1,u,v,w)
-         Pb = PyramidNodalPBasis(4,u,v,w)
-      CASE (5)
-         phiPar = u/2 + v/2 + s
-         Pa = PyramidNodalPBasis(1,u,v,w)
-         Pb = PyramidNodalPBasis(5,u,v,w)
-      CASE (6)
-         phiPar = -u/2 + v/2 + s
-         Pa = PyramidNodalPBasis(2,u,v,w)
-         Pb = PyramidNodalPBasis(5,u,v,w)
-      CASE (7)
-         phiPar = -u/2 - v/2 + s
-         Pa = PyramidNodalPBasis(3,u,v,w)
-         Pb = PyramidNodalPBasis(5,u,v,w)
-      CASE (8)
-         phiPar =  u/2 - v/2 + s
-         Pa = PyramidNodalPBasis(4,u,v,w)
-         Pb = PyramidNodalPBasis(5,u,v,w)
-      CASE DEFAULT
-         CALL Fatal('PElementBase::PyramidEdgePBasis','Unknown edge for pyramid')
+      local = getPyramidEdgeMap(edge)
+
+      Pa = PyramidNodalPBasis(local(1),u,v,w)
+      Pb = PyramidNodalPBasis(local(2),u,v,w)
+
+      SELECT CASE(Edge)
+      CASE(1,2,3,4)
+        La = PyramidL(local(1),u,v)
+        Lb = PyramidL(local(2),u,v)
+      CASE(5,6,7,8)
+        La = PyramidTL(local(1),u,v,w)
+        Lb = PyramidTL(local(2),u,v,w)
       END SELECT
 
+      s = w/sq2
       ! Invert edge if needed
+      PhiPar = Lb-La
       IF (invert) phiPar = -phiPar
 
       ! Calculate value of edge function
@@ -5409,88 +5386,40 @@ MODULE PElementBase
       REAL(KIND=dp), INTENT(IN) :: u,v,w
       LOGICAL, INTENT(IN), OPTIONAL :: invertEdge
       ! Variables
-      REAL(KIND=dp), DIMENSION(3) :: dPa, dPb, dPhiPar, grad
-      REAL(KIND=dp) :: Pa, Pb, phiPar, vPhiI, sq2=SQRT(2.0_dp)
+      REAL(KIND=dp), DIMENSION(3) :: dLa, dLb, dPa, dPb, dPhiPar, grad
+      REAL(KIND=dp) :: La, Lb, Pa, Pb, phiPar, vPhiI, sq2=SQRT(2.0_dp)
       LOGICAL :: invert
-            
+      INTEGER :: local(2)
 
       ! Edge is not inverted by default
       invert = .FALSE.
       IF (PRESENT(invertEdge)) invert = invertEdge
 
-      ! Set parameters
-      grad = 0
-      dPhiPar = 0
+      local = getPyramidEdgeMap(edge)
+
+      Pa  = PyramidNodalPBasis(local(1), u,v,w)
+      Pb  = PyramidNodalPBasis(local(2), u,v,w)
+      dPa = dPyramidNodalPBasis(local(1), u,v,w)
+      dPb = dPyramidNodalPBasis(local(2), u,v,w)
+
       SELECT CASE(edge)
-      CASE (1)
-         phiPar = u
-         dPhiPar(1) = 1 
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(2,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(2,u,v,w)
-      CASE (2)
-         phiPar = v
-         dPhiPar(2) = 1
-         Pa  = PyramidNodalPBasis(2,u,v,w)
-         Pb  = PyramidNodalPBasis(3,u,v,w)
-         dPa = dPyramidNodalPBasis(2,u,v,w)
-         dPb = dPyramidNodalPBasis(3,u,v,w)
-      CASE (3)
-         phiPar = u
-         dPhiPar(1) = 1
-         Pa  = PyramidNodalPBasis(4,u,v,w)
-         Pb  = PyramidNodalPBasis(3,u,v,w)
-         dPa = dPyramidNodalPBasis(4,u,v,w)
-         dPb = dPyramidNodalPBasis(3,u,v,w)
-      CASE (4)
-         phiPar = v
-         dPhiPar(2) = 1
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(4,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(4,u,v,w)
-      CASE (5)
-         phiPar = u/2 + v/2 + w/sq2
-         dPhiPar(1) = 1d0/2
-         dPhiPar(2) = 1d0/2
-         dPhiPar(3) = 1/sq2
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-      CASE (6)
-         phiPar = -u/2 + v/2 + w/sq2
-         dPhiPar(1) = -1d0/2
-         dPhiPar(2) =  1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(2,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(2,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-      CASE (7)
-         phiPar = -u/2 - v/2 + w/sq2
-         dPhiPar(1) = -1d0/2
-         dPhiPar(2) = -1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(3,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(3,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-      CASE (8)
-         phiPar = u/2 - v/2 + w/sq2
-         dPhiPar(1) =  1d0/2
-         dPhiPar(2) = -1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(4,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(4,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-      CASE DEFAULT
-         CALL Fatal('PElementBase::dPyramidEdgePBasis','Unknown edge for pyramid')
+      CASE(1,2,3,4)
+        La = PyramidL(local(1),u,v)
+        Lb = PyramidL(local(2),u,v)
+
+        dLa = dPyramidL(local(1),u,v)
+        dLb = dPyramidL(local(2),u,v)
+      CASE(5,6,7,8)
+        La = PyramidTL(local(1),u,v,w)
+        Lb = PyramidTL(local(2),u,v,w)
+
+        dLa = dPyramidTL(local(1),u,v,w)
+        dLb = dPyramidTL(local(2),u,v,w)
       END SELECT
 
       ! Invert edge if needed
+      PhiPar = Lb-La
+      dPhiPar = dLb-dLa
       IF (invert) THEN
          phiPar  = -phiPar
          dPhiPar = -dPhiPar
@@ -5535,106 +5464,45 @@ MODULE PElementBase
       REAL(KIND=dp), INTENT(IN) :: u,v,w
       LOGICAL, INTENT(IN), OPTIONAL :: invertEdge
       ! Variables
-      INTEGER :: p,q
-      REAL(KIND=dp), DIMENSION(3) :: dPa, dPb, dPhiPar, dvPhiI
-      REAL(KIND=dp), DIMENSION(3,3) :: ddPa, ddPb, ddvPhiI
-      REAL(KIND=dp) :: Pa, Pb, phiPar, vPhiI, sq2=SQRT(2.0_dp), grad(3,3)
+      INTEGER :: p,q, local(2)
+      REAL(KIND=dp) :: La, Lb, Pa, Pb, phiPar, vPhiI
+      REAL(KIND=dp), DIMENSION(3) :: dLa, dLb, dPa, dPb, dPhiPar, dvPhiI
+      REAL(KIND=dp), DIMENSION(3,3) :: ddPa, ddPb, ddvPhiI, grad
       LOGICAL :: invert
-            
 
       ! Edge is not inverted by default
       invert = .FALSE.
       IF (PRESENT(invertEdge)) invert = invertEdge
 
-      ! Set parameters
-      grad = 0
-      dPhiPar = 0
-      SELECT CASE(edge)
-      CASE (1)
-         phiPar = u
-         dPhiPar(1) = 1 
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(2,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(2,u,v,w)
-         ddPa = ddPyramidNodalPBasis(1,u,v,w)
-         ddPb = ddPyramidNodalPBasis(4,u,v,w)
-      CASE (2)
-         phiPar = v
-         dPhiPar(2) = 1
-         Pa  = PyramidNodalPBasis(2,u,v,w)
-         Pb  = PyramidNodalPBasis(3,u,v,w)
-         dPa = dPyramidNodalPBasis(2,u,v,w)
-         dPb = dPyramidNodalPBasis(3,u,v,w)
-         ddPa = ddPyramidNodalPBasis(2,u,v,w)
-         ddPb = ddPyramidNodalPBasis(3,u,v,w)
-      CASE (3)
-         phiPar = u
-         dPhiPar(1) = 1
-         Pa  = PyramidNodalPBasis(3,u,v,w)
-         Pb  = PyramidNodalPBasis(4,u,v,w)
-         dPa = dPyramidNodalPBasis(3,u,v,w)
-         dPb = dPyramidNodalPBasis(4,u,v,w)
-         ddPa = ddPyramidNodalPBasis(3,u,v,w)
-         ddPb = ddPyramidNodalPBasis(4,u,v,w)
-      CASE (4)
-         phiPar = v
-         dPhiPar(2) = 1
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(4,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(4,u,v,w)
-         ddPa = ddPyramidNodalPBasis(1,u,v,w)
-         ddPb = ddPyramidNodalPBasis(4,u,v,w)
-      CASE (5)
-         phiPar = u/2 + v/2 + w/sq2
-         dPhiPar(1) = 1d0/2
-         dPhiPar(2) = 1d0/2
-         dPhiPar(3) = 1/sq2
-         Pa  = PyramidNodalPBasis(1,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(1,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-         ddPa = ddPyramidNodalPBasis(1,u,v,w)
-         ddPb = ddPyramidNodalPBasis(5,u,v,w)
-      CASE (6)
-         phiPar = -u/2 + v/2 + w/sq2
-         dPhiPar(1) = -1d0/2
-         dPhiPar(2) =  1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(2,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(2,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-         ddPa = ddPyramidNodalPBasis(2,u,v,w)
-         ddPb = ddPyramidNodalPBasis(5,u,v,w)
-      CASE (7)
-         phiPar = -u/2 - v/2 + w/sq2
-         dPhiPar(1) = -1d0/2
-         dPhiPar(2) = -1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(3,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(3,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-         ddPa = ddPyramidNodalPBasis(3,u,v,w)
-         ddPb = ddPyramidNodalPBasis(5,u,v,w)
-      CASE (8)
-         phiPar = u/2 - v/2 + w/sq2
-         dPhiPar(1) =  1d0/2
-         dPhiPar(2) = -1d0/2
-         dPhiPar(3) =  1/sq2
-         Pa  = PyramidNodalPBasis(4,u,v,w)
-         Pb  = PyramidNodalPBasis(5,u,v,w)
-         dPa = dPyramidNodalPBasis(4,u,v,w)
-         dPb = dPyramidNodalPBasis(5,u,v,w)
-         ddPa = ddPyramidNodalPBasis(4,u,v,w)
-         ddPb = ddPyramidNodalPBasis(5,u,v,w)
-      CASE DEFAULT
-         CALL Fatal('PElementBase::dPyramidEdgePBasis','Unknown edge for pyramid')
-      END SELECT
+      local = getPyramidEdgeMap(edge)
 
+      Pa   = PyramidNodalPBasis(local(1),u,v,w)
+      Pb   = PyramidNodalPBasis(local(2),u,v,w)
+
+      dPa  = dPyramidNodalPBasis(local(1),u,v,w)
+      dPb  = dPyramidNodalPBasis(local(2),u,v,w)
+
+      ddPa = ddPyramidNodalPBasis(local(1),u,v,w)
+      ddPb = ddPyramidNodalPBasis(local(2),u,v,w)
+
+      SELECT CASE(edge)
+      CASE(1,2,3,4)
+        La  = PyramidL(local(1),u,v)
+        Lb  = PyramidL(local(2),u,v)
+
+        dLa = dPyramidL(local(1),u,v)
+        dLb = dPyramidL(local(2),u,v)
+      CASE(5,6,7,8)
+        La  = PyramidTL(local(1),u,v,w)
+        Lb  = PyramidTL(local(2),u,v,w)
+
+        dLa = dPyramidTL(local(1),u,v,w)
+        dLb = dPyramidTL(local(2),u,v,w)
+      END SELECT
+ 
       ! Invert edge if needed
+      PhiPar = Lb-La
+      dPhiPar = dLb-dLa
       IF (invert) THEN
          phiPar  = -phiPar
          dPhiPar = -dPhiPar
@@ -5740,7 +5608,6 @@ MODULE PElementBase
          local(1:4) = localNumbers
       END IF
 
-      s = w/SQRT(2.0_dp)
       SELECT CASE(face)
       CASE (1)
          Pa = PyramidNodalPBasis(local(1),u,v,w)
@@ -5756,24 +5623,9 @@ MODULE PElementBase
          Pb = PyramidNodalPBasis(local(2),u,v,w)
          Pc = PyramidNodalPBasis(local(3),u,v,w)
 
-         SELECT CASE(face)
-         CASE(2)
-           La = PyramidTL(1,u,v,w)
-           Lb = PyramidTL(2,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-         CASE(3)
-           La = PyramidTL(2,u,v,w)
-           Lb = PyramidTL(3,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-         CASE(4)
-           La = PyramidTL(4,u,v,w)
-           Lb = PyramidTL(3,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-         CASE(5)
-           La = PyramidTL(1,u,v,w)
-           Lb = PyramidTL(4,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-         END SELECT
+         La = PyramidTL(local(1),u,v,w)
+         Lb = PyramidTL(local(2),u,v,w)
+         Lc = PyramidTL(local(3),u,v,w)
 
          value = Pa*Pb*Pc*LegendreP(i,Lb-La)*LegendreP(j,2*Lc-1)
       CASE DEFAULT
@@ -5861,36 +5713,13 @@ MODULE PElementBase
          dPb = dPyramidNodalPBasis(local(2),u,v,w)
          dPc = dPyramidNodalPBasis(local(3),u,v,w)
 
-         SELECT CASE(face)
-         CASE(2)
-           La  = PyramidTL(1,u,v,w)
-           Lb  = PyramidTL(2,u,v,w)
-           Lc  = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL((1),u,v,w)
-           dLb = dPyramidTL((2),u,v,w)
-           dLc = dPyramidTL((5),u,v,w)
-         CASE(3)
-           La = PyramidTL(2,u,v,w)
-           Lb = PyramidTL(3,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(2,u,v,w)
-           dLb = dPyramidTL(3,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         CASE(4)
-           La = PyramidTL(4,u,v,w)
-           Lb = PyramidTL(3,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(4,u,v,w)
-           dLb = dPyramidTL(3,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         CASE(5)
-           La = PyramidTL(1,u,v,w)
-           Lb = PyramidTL(4,u,v,w)
-           Lc = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(1,u,v,w)
-           dLb = dPyramidTL(4,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         END SELECT
+         La = PyramidTL(local(1),u,v,w)
+         Lb = PyramidTL(local(2),u,v,w)
+         Lc = PyramidTL(local(3),u,v,w)
+
+         dLa = dPyramidTL(local(1),u,v,w)
+         dLb = dPyramidTL(local(2),u,v,w)
+         dLc = dPyramidTL(local(3),u,v,w)
 
          legI  = LegendreP(i,Lb-La)
          legJ  = LegendreP(j,2*Lc-1)
@@ -6083,36 +5912,13 @@ MODULE PElementBase
          ddPb = ddPyramidNodalPBasis(local(2),u,v,w)
          ddPc = ddPyramidNodalPBasis(local(3),u,v,w)
 
-         SELECT CASE(face)
-         CASE(2)
-           La  = PyramidTL(1,u,v,w)
-           Lb  = PyramidTL(2,u,v,w)
-           Lc  = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL((1),u,v,w)
-           dLb = dPyramidTL((2),u,v,w)
-           dLc = dPyramidTL((5),u,v,w)
-         CASE(3)
-           La  = PyramidTL(2,u,v,w)
-           Lb  = PyramidTL(3,u,v,w)
-           Lc  = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(2,u,v,w)
-           dLb = dPyramidTL(3,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         CASE(4)
-           La  = PyramidTL(4,u,v,w)
-           Lb  = PyramidTL(3,u,v,w)
-           Lc  = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(4,u,v,w)
-           dLb = dPyramidTL(3,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         CASE(5)
-           La  = PyramidTL(1,u,v,w)
-           Lb  = PyramidTL(4,u,v,w)
-           Lc  = PyramidTL(5,u,v,w)
-           dLa = dPyramidTL(1,u,v,w)
-           dLb = dPyramidTL(4,u,v,w)
-           dLc = dPyramidTL(5,u,v,w)
-         END SELECT
+         La  = PyramidTL(local(1),u,v,w)
+         Lb  = PyramidTL(local(2),u,v,w)
+         Lc  = PyramidTL(local(3),u,v,w)
+
+         dLa = dPyramidTL(local(1),u,v,w)
+         dLb = dPyramidTL(local(2),u,v,w)
+         dLc = dPyramidTL(local(3),u,v,w)
 
          legI   = LegendreP(i,Lb-La)
          legJ   = LegendreP(j,2*Lc-1)

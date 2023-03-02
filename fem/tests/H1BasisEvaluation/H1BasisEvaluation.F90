@@ -91,7 +91,7 @@ SUBROUTINE H1BasisEvaluation( Model,Solver,dt,TransientSimulation )
       nerror = nerror + netest
     END DO
 
-    DO P=1,2!MaxP
+    DO P=1,MaxP
       netest = TestPyramidElement(Solver, tol3d, P)
       IF (netest /= 0) THEN
         CALL Warn('H1BasisEvaluation','Pyramid element contained errors')
@@ -1261,7 +1261,7 @@ CONTAINS
     INTEGER :: i, j, k, l, q, ngp, nerror, nbasis, nndof, nedof, &
           nfdof, nbdof, allocstat, perm, &
           nbasisvec, ndbasisdxvec, rep, dim, tag, ndof, ll, lln, ncl
-    INTEGER, PARAMETER :: NREP = 1, EdgePerm=2, FacePerm=4
+    INTEGER, PARAMETER :: NREP = 100, EdgePerm=2, FacePerm=4
     REAL(kind=dp) :: t_start, t_end, t_startvec, t_endvec, &
             t_start_tmp, t_tot_n, t_totvec_n, &
             t_tot_e, t_totvec_e, t_tot_f, t_totvec_f, t_tot_b, t_totvec_b
@@ -1288,7 +1288,7 @@ CONTAINS
 
     nndof = Element % Type % NumberOfNodes
     nedof = getEdgeDOFs( Element, P)
-    nfdof = getFaceDofs(Element, P, 1)+3*getFaceDOFs(Element, P, 2)
+    nfdof = getFaceDofs(Element, P, 1)+4*getFaceDOFs(Element, P, 2)
     nbdof = Element % Bdofs
     nbasis = nndof + 8*nedof*EdgePerm + nfdof*FacePerm + nbdof
     ngp = GP % N
@@ -1330,11 +1330,12 @@ CONTAINS
       FaceDir(1:4,i,1)=getPyramidFaceMap(i)
     END DO
     DO j=2,FacePerm
-      DO i=2,5
-        FaceDir(1:3,i,j)=CSHIFT(FaceDir(1:3,i,1), j-1)
-      END DO
       DO i=1,1
         FaceDir(1:4,i,j)=CSHIFT(FaceDir(1:4,i,1), j-1)
+      END DO
+
+      DO i=2,5
+        FaceDir(1:3,i,j)=CSHIFT(FaceDir(1:3,i,1), j-1)
       END DO
     END DO
 
@@ -1362,15 +1363,15 @@ CONTAINS
       IF (P > 1) THEN
         ! Edge basis
         t_start_tmp=ftimer()
-        DO perm=1,1! EdgePerm
+        DO perm=1,EdgePerm
           DO i=1,8
             DO ndof=1,nedof
               q=q+1
               DO k=1,ngp
                 Basis(k,q) = PyramidEdgePBasis(i, ndof+1, UWrk(k), VWrk(k), WWrk(k), &
                         InvertEdge(i,perm))
-    !           dBasisdx(k,q,1:3) = dPyramidEdgePBasis(i, ndof+1, UWrk(k), VWrk(k), WWrk(k), &
-    !                   InvertEdge(i,perm))
+                dBasisdx(k,q,1:3) = dPyramidEdgePBasis(i, ndof+1, UWrk(k), VWrk(k), WWrk(k), &
+                        InvertEdge(i,perm))
               END DO
             END DO
           END DO
@@ -1378,25 +1379,10 @@ CONTAINS
         t_tot_e=t_tot_e+(ftimer()-t_start_tmp)
       END IF
 
-#if 0
       IF (P >= 2) THEN
         ! Face basis
         t_start_tmp=ftimer()
         DO perm=1,FacePerm
-          ! Triangle faces
-          DO i=2,5
-            DO j=0,p-3
-              DO k=0,p-j-3
-                q = q + 1
-                DO l=1,ngp
-                  Basis(l,q) = PyramidFacePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l), &
-                          FaceDir(1:4,i,perm))
-                  dBasisdx(l,q,1:3) = dPyramidFacePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l), &
-                          FaceDir(1:4,i,perm))
-                END DO
-              END DO
-            END DO
-          END DO
           ! Square faces
           DO i=1,1
             ! First and second node must form an edge in the upper or lower triangle
@@ -1424,6 +1410,20 @@ CONTAINS
               END DO
             END DO
           END DO
+          ! Triangle faces
+          DO i=2,5
+            DO j=0,p-3
+              DO k=0,p-j-3
+                q = q + 1
+                DO l=1,ngp
+                  Basis(l,q) = PyramidFacePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l), &
+                          FaceDir(1:4,i,perm))
+                  dBasisdx(l,q,1:3) = dPyramidFacePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l), &
+                          FaceDir(1:4,i,perm))
+                END DO
+              END DO
+            END DO
+          END DO
         END DO
         t_tot_f=t_tot_f+(ftimer()-t_start_tmp)
       END IF
@@ -1444,7 +1444,6 @@ CONTAINS
         END DO
         t_tot_b=t_tot_b+(ftimer()-t_start_tmp)
       END IF
-#endif
     END DO
     t_end = ftimer()
     
@@ -1477,19 +1476,19 @@ CONTAINS
         t_totvec_n=t_totvec_n+(ftimer()-t_start_tmp)
         IF (P > 1) THEN
           t_start_tmp=ftimer()
-          DO perm=1,1!EdgePerm
+          DO perm=1,EdgePerm
             CALL H1Basis_PyramidEdgeP(ncl, UBlk, VBlk, WBlk, EdgeP, &
                     SIZE(BasisBlk,2), BasisBlk, nbasisvec, EdgeDir(:,:,perm))
-       !    CALL H1Basis_dPyramidEdgeP(ncl, UBlk, VBlk, WBlk, EdgeP, &
-       !            SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, EdgeDir(:,:,perm))
+            CALL H1Basis_dPyramidEdgeP(ncl, UBlk, VBlk, WBlk, EdgeP, &
+                    SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, EdgeDir(:,:,perm))
           END DO
           t_totvec_e=t_totvec_e+(ftimer()-t_start_tmp)    
 
-#if 0
           t_start_tmp=ftimer()
           DO perm=1,FacePerm
             CALL H1Basis_PyramidFaceP(ncl, UBlk, VBlk, WBlk, FaceP, &
                     SIZE(BasisBlk,2), BasisBlk, nbasisvec, FaceDir(:,:,perm))
+
             CALL H1Basis_dPyramidFaceP(ncl, UBlk, VBlk, WBlk, FaceP, &
                     SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, FaceDir(:,:,perm))
           END DO
@@ -1501,7 +1500,6 @@ CONTAINS
           CALL H1Basis_dPyramidBubbleP(ncl, UBlk, VBlk, WBlk, P, &
                   SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec)
           t_totvec_b=t_totvec_b+(ftimer()-t_start_tmp)
-#endif
         END IF
 
         BasisVec(ll:lln,1:nbasisvec)=BasisBlk(1:ncl,1:nbasisvec)
