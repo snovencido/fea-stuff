@@ -856,9 +856,6 @@ CONTAINS
     INTEGER :: i,j,k, nnb, node1, node2
 !DIR$ ASSUME_ALIGNED u:64, v:64, fval:64
 
-! not used, if/as nodal basis already present?
-!   nnb = 0; CALL H1Basis_QuadNodal(nvec, u, v, nbasismax, n, nnb )
-
     ! For each edge
     DO i=1,4
       node1 = edgedir(1,i)
@@ -871,8 +868,6 @@ CONTAINS
 
           Na = fval(k,node1)
           Nb = fval(k,node2)
-!         Na = N(k,node1)
-!         Nb = N(k,node2)
 
           fval(k, nbasis+j-1) = c*Na*Nb*H1Basis_varPhi(j, Lb-La)
         END DO

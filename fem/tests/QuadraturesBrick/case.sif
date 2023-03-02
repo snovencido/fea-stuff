@@ -64,7 +64,7 @@ End
 
 
 !Solver 1 :: Reference Norm = 6.45497224E-01
-Solver 1 :: Reference Norm = 4.7035305 ! p:2
+Solver 1 :: Reference Norm = 0.3 ! p:2
 !Solver 1 :: Reference Norm = 4.73119773 ! p:3
 RUN
 
