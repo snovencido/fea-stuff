@@ -1253,7 +1253,7 @@ SUBROUTINE IncompressibleNSSolver_Init0(Model, Solver, dt, Transient)
   LOGICAL :: Transient
 !------------------------------------------------------------------------------  
   CALL ListAddNewString(GetSolverParams(),'Element', &
-    'p:1 -tri b:1 -tetra b:1 -quad b:3 -brick b:4 -prism b:4 -pyramid b:4')
+    'p:1 -tri b:1 -tetra b:1 -quad b:4 -brick b:8 -prism b:4 -pyramid b:4')
 !------------------------------------------------------------------------------
 END SUBROUTINE IncompressibleNSSolver_Init0
 !------------------------------------------------------------------------------

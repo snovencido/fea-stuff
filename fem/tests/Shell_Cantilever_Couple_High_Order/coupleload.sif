@@ -126,5 +126,5 @@ End
 
 ! The test norm for the case p=4
 !
-Solver 1 :: Reference Norm = Real 1.48079900E+00
+Solver 1 :: Reference Norm = Real 1.15863650E+00
 Solver 1 :: Reference Norm Tolerance = Real 1.0e-5

@@ -62,7 +62,7 @@ SUBROUTINE HeatSolver_Init0(Model, Solver, dt, Transient)
       ListGetLogical( Params,'Bubbles',Found) ) THEN
     IF( .NOT. ListCheckPresent( Params,'Element') ) THEN
       CALL ListAddString(Params,'Element', &
-          'p:1 -tri b:1 -tetra b:1 -quad b:3 -brick b:4 -prism b:4 -pyramid b:4')
+          'p:1 -tri b:1 -tetra b:1 -quad b:4 -brick b:8 -prism b:4 -pyramid b:4')
       CALL ListAddNewLogical(Params,'Bubbles in Global System',.FALSE.)
     END IF
   END IF

@@ -18,7 +18,7 @@ Simulation
   Steady State Min Iterations = 1
   Output Intervals = 1
 
-!  Post File = "case.ep"
+! Post File = "case.ep"
 End
 
 Constants
@@ -107,5 +107,5 @@ Boundary Condition 1
 End
 
 
-Solver 1 :: Reference Norm = Real 0.70851516
+Solver 1 :: Reference Norm = Real 6.20729242E-01
 RUN

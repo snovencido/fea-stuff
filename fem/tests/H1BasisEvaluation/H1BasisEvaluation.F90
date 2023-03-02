@@ -594,11 +594,11 @@ CONTAINS
         CALL NodalFirstDerivatives2D( dBasisdx(i,1:nndof,1:3), Element, UWrk(i), VWrk(i))
       END DO
       t_tot_n=t_tot_n+(ftimer()-t_start_tmp)
+      q = 4
 
       IF (P>1) THEN
         ! Edge basis
         t_start_tmp=ftimer()
-        q = 4
         DO perm=1,EdgePerm
           DO i=1,4
             DO ndof=1,nedof
@@ -614,11 +614,11 @@ CONTAINS
       END IF
 
       ! Bubble basis 
-      IF (P > 3) THEN
+      IF (P >= 2) THEN
         IF (.NOT. isEdge) THEN
           t_start_tmp=ftimer()
-          DO i=2,(p-2)
-            DO j=2,(p-i)
+          DO i=0,p-2
+            DO j=0,p-2
               q = q + 1
               DO k = 1, ngp
                 Basis(k, q) = QuadBubblePBasis(i,j,UWrk(k),VWrk(k))
@@ -629,9 +629,9 @@ CONTAINS
           t_tot_b=t_tot_b+(ftimer()-t_start_tmp)
         ELSE
           t_start_tmp=ftimer()
-          DO perm=1,BubblePerm
-            DO i=2,(p-2)
-              DO j=2,(p-i)
+          DO perm=1, BubblePerm
+            DO i=0,p-2
+              DO j=0,p-2
                 q = q + 1
                 DO k = 1, ngp
                   Basis(k, q) = QuadBubblePBasis(i,j,UWrk(k),VWrk(k),&
@@ -675,16 +675,17 @@ CONTAINS
         IF (P > 1) THEN
           ! Edge basis
           t_start_tmp=ftimer()
-          DO perm=1,EdgePerm
+          DO perm=1, EdgePerm
             CALL H1Basis_QuadEdgeP(ncl, UBlk, VBlk, EdgeP, &
                     SIZE(BasisBlk,2), BasisBlk, nbasisvec, EdgeDir(:,:,perm))
+
             CALL H1Basis_dQuadEdgeP(ncl, UBlk, VBlk, EdgeP, &
                     SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, EdgeDir(:,:,perm))
           END DO
           t_totvec_e=t_totvec_e+(ftimer()-t_start_tmp)
         END IF
 
-        IF (P > 3) THEN
+        IF (P >= 2) THEN
           IF (.NOT. isEdge) THEN
             t_start_tmp=ftimer()
             CALL H1Basis_QuadBubbleP(ncl, UBlk, VBlk, P, &
@@ -695,7 +696,7 @@ CONTAINS
             t_totvec_b=t_totvec_b+(ftimer()-t_start_tmp)
           ELSE
             t_start_tmp=ftimer()
-            DO perm=1,BubblePerm
+            DO perm=1, BubblePerm
               CALL H1Basis_QuadBubbleP(ncl, UBlk, VBlk, P, &
                       SIZE(BasisBlk,2), BasisBlk, nbasisvec, BubbleDir(1:4,perm))
               
@@ -996,7 +997,7 @@ CONTAINS
     END IF
 
     GP = GaussPoints(Element)
-    
+
     nndof = Element % Type % NumberOfNodes
     nedof = getEdgeDOFs( Element, P )
     nfdof = 2*getFaceDofs( Element, P, 1)+3*getFaceDOFs( Element, P, 3 )
@@ -1068,11 +1069,11 @@ CONTAINS
         END DO
       END Do
       t_tot_n=t_tot_n+(ftimer()-t_start_tmp)
+      q = 6
 
       IF (P > 1) THEN
         ! Edge basis
         t_start_tmp=ftimer()
-        q = 6
         DO perm=1,EdgePerm
           DO i=1,9
             DO ndof=1,nedof
@@ -1089,7 +1090,7 @@ CONTAINS
         t_tot_e=t_tot_e+(ftimer()-t_start_tmp)
       END IF
 
-      IF (P > 2) THEN
+      IF (P >= 2) THEN
         ! Face basis
         t_start_tmp=ftimer()
         DO perm=1,FacePerm
@@ -1119,8 +1120,8 @@ CONTAINS
               direction(4) = tmp
             END IF
             
-            DO j=2,p-2
-              DO k=2,p-j
+            DO j=0,p-2
+              DO k=0,p-2
                 q = q + 1
                 IF (.NOT. invert) THEN
                   DO l=1,ngp
@@ -1145,11 +1146,11 @@ CONTAINS
       END IF
       
       ! Bubble basis 
-      IF (P > 4) THEN
+      IF (P >=2 ) THEN
         t_start_tmp=ftimer()
-        DO i=0,p-5
-          DO j=0,p-5-i
-            DO k=2,p-3-i-j
+        DO i=0,p-2
+          DO j=0,p-i-2
+            DO k=0,p-i-j-2
               q = q + 1
               DO l = 1, ngp
                 Basis(l, q) = WedgeBubblePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l))
@@ -1199,8 +1200,7 @@ CONTAINS
                     SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, EdgeDir(:,:,perm))
           END DO
           t_totvec_e=t_totvec_e+(ftimer()-t_start_tmp)    
-        END IF
-        IF (P > 2) THEN
+
           t_start_tmp=ftimer()
           DO perm=1,FacePerm
             CALL H1Basis_WedgeFaceP(ncl, UBlk, VBlk, WBlk, FaceP, &
@@ -1209,8 +1209,7 @@ CONTAINS
                     SIZE(dBasisdxBlk,2), dBasisdxBlk, ndbasisdxvec, FaceDir(:,:,perm))
           END DO
           t_totvec_f=t_totvec_f+(ftimer()-t_start_tmp)    
-        END IF
-        IF (P > 4) THEN
+
           t_start_tmp=ftimer()
           CALL H1Basis_WedgeBubbleP(ncl, UBlk, VBlk, WBlk, P, &
                   SIZE(BasisBlk,2), BasisBlk, nbasisvec)
@@ -1344,11 +1343,11 @@ CONTAINS
                 UWrk(i), VWrk(i), WWrk(i))
       END DO
       t_tot_n=t_tot_n+(ftimer()-t_start_tmp)
+      q = 8
 
       ! Edge basis
       IF (P > 1) THEN
         t_start_tmp=ftimer()
-        q = 8
         DO perm=1,EdgePerm
           DO i=1,12
             DO ndof=1,nedof
@@ -1365,13 +1364,13 @@ CONTAINS
         t_tot_e=t_tot_e+(ftimer()-t_start_tmp)
       END IF
 
-      IF (P > 3) THEN
+      IF (P >=2) THEN
         ! Face basis
         t_start_tmp=ftimer()
         DO perm=1,FacePerm
           DO i=1,6
-            DO j=2,FaceP(i)-2
-              DO k=2,FaceP(i)-j
+            DO j=0,FaceP(i)-2
+              DO k=0,FaceP(i)-2
                 q = q + 1
                 DO l=1,ngp
                   Basis(l,q) = BrickFacePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l), &
@@ -1387,17 +1386,15 @@ CONTAINS
       END IF
 
       ! Bubble basis 
-      IF (P > 5) THEN
+      IF (P >= 2) THEN
         t_start_tmp=ftimer()
-        DO i=2,p-4
-          DO j=2,p-i-2
-            DO k=2,p-i-j
+        DO i=0,p-2
+          DO j=0,p-2
+            DO k=0,p-2
               q = q + 1
               DO l=1,ngp
-                Basis(l,q) = BrickBubblePBasis(i,j,k, &
-                        UWrk(l), VWrk(l), WWrk(l))
-                dBasisdx(l,q,:) = dBrickBubblePBasis(i,j,k, &
-                        UWrk(l), VWrk(l), WWrk(l))
+                Basis(l,q) = BrickBubblePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l))
+                dBasisdx(l,q,:) = dBrickBubblePBasis(i,j,k,UWrk(l), VWrk(l), WWrk(l))
               END DO
             END DO
           END DO
@@ -1444,7 +1441,7 @@ CONTAINS
           t_totvec_e=t_totvec_e+(ftimer()-t_start_tmp)
         END IF
 
-        IF (P > 3) THEN
+        IF (P >= 2) THEN
           t_start_tmp=ftimer()
           DO perm=1,FacePerm
             CALL H1Basis_BrickFaceP(ncl, UBlk, VBlk, WBlk, FaceP, &
@@ -1455,7 +1452,7 @@ CONTAINS
           t_totvec_f=t_totvec_f+(ftimer()-t_start_tmp)
         END IF
 
-        IF (P > 5) THEN
+        IF (P >= 2) THEN
           t_start_tmp=ftimer()
           CALL H1Basis_BrickBubbleP(ncl, UBlk, VBlk, WBlk, P, &
                   SIZE(BasisBlk,2), BasisBlk, nbasisvec)

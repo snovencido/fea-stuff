@@ -2525,12 +2525,13 @@ CONTAINS
 !------------------------------------------------------------------------------
 !>  Return basis function degrees
 !------------------------------------------------------------------------------
-   SUBROUTINE ElementBasisDegree( Element, BasisDegree )
+   SUBROUTINE ElementBasisDegree( Element, BasisDegree, USolver )
 !------------------------------------------------------------------------------
      IMPLICIT NONE
 
      TYPE(Element_t), TARGET :: Element   !< Element structure
      INTEGER :: BasisDegree(:)            !< Degree of each basis function in Basis(:) vector. 
+     TYPE(Solver_t), TARGET, OPTIONAL :: USolver
 !------------------------------------------------------------------------------
 !    Local variables
 !------------------------------------------------------------------------------
@@ -2538,15 +2539,34 @@ CONTAINS
      REAL(KIND=dp) :: t,s
      LOGICAL :: invert, degrees
      INTEGER :: i, j, k, l, q, p, f, n, nb, dim, cdim, locali, localj,  &
-          tmp(4), direction(4)
+          tmp(4), direction(4), BDOFs, BodyId
+
+     TYPE(Solver_t), POINTER :: pSolver
 
      TYPE(Element_t) :: Bubble
-     TYPE(Element_t), POINTER :: Edge, Face
+     TYPE(Element_t), POINTER :: Edge, Face, Parent
 !------------------------------------------------------------------------------
+
+     IF( PRESENT( USolver ) ) THEN
+       pSolver => USolver
+     ELSE
+       pSolver => CurrentModel % Solver
+     END IF
 
      n    = Element % TYPE % NumberOfNodes
      dim  = Element % TYPE % DIMENSION
      cdim = CoordinateSystemDimension()
+
+     BodyId = Element % BodyId
+     IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
+       Parent => Element % PDefs % LocalParent
+       IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
+     END IF
+     IF (BodyId==0) THEN
+       CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
+       BodyId = 1
+     END IF
+
 
      BasisDegree = 0
      BasisDegree(1:n) = Element % Type % BasisFunctionDegree
@@ -2567,9 +2587,14 @@ CONTAINS
      ! --------------------------------
      CASE(202)
         ! Bubbles of line element
-        IF (Element % BDOFs > 0) THEN
+        p = pSolver % Def_Dofs(2,BodyId,6)
+        nb = pSolver % Def_Dofs(2,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+
+        IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
            ! For each bubble in line element get value of basis function
-           DO i=1, Element % BDOFs
+           DO i=1, BDOFs
              IF (q >= SIZE(BasisDegree)) CYCLE
              q = q + 1
              BasisDegree(q) = 1+i
@@ -2595,13 +2620,14 @@ CONTAINS
         END IF
 
         ! Bubbles of p triangle      
-        IF ( Element % BDOFs > 0 ) THEN
-           ! Get element p
-           p = Element % PDefs % P
 
-           nb = MAX( GetBubbleDOFs( Element, p ), Element % BDOFs )
-           p = CEILING( ( 3.0d0+SQRT(1.0d0+8.0d0*nb) ) / 2.0d0 - AEPS )
-           
+        p = pSolver % Def_Dofs(3,BodyId,6)
+        nb = pSolver % Def_Dofs(3,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF ( BDOFs > 0 ) THEN
+           ! Get element p
+           p = getEffectiveBubbleP(element,p,bdofs)
+
            DO i = 0,p-3
               DO j = 0,p-i-3
                  IF ( q >= SIZE(BasisDegree) ) CYCLE
@@ -2628,17 +2654,20 @@ CONTAINS
         END IF
 
         ! Bubbles of p quadrilateral
-        IF ( Element % BDOFs > 0 ) THEN
+        p = pSolver % Def_Dofs(4,BodyId,6)
+        nb = pSolver % Def_Dofs(4,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF ( BDOFs > 0 ) THEN
           ! Get element P
-           p = Element % PDefs % P
-
-           nb = MAX( GetBubbleDOFs( Element, p ), Element % BDOFs )
+           p = getEffectiveBubbleP(element,p,bdofs)
           
-           DO i=2,(p-2)
-              DO j=2,(p-i)
+!          DO i=2,(p-2)
+!             DO j=2,(p-i)
+           DO i=0,p-2
+              DO j=0,p-2
                  IF ( q >= SIZE(BasisDegree) ) CYCLE
                  q = q + 1
-                 BasisDegree(q) = i+j
+                 BasisDegree(q) = 2+i+j
               END DO
            END DO
         END IF
@@ -2690,12 +2719,11 @@ CONTAINS
         END IF
 
         ! Bubbles of p tetrahedron
-        IF ( Element % BDOFs > 0 ) THEN
-           p = Element % PDefs % P
-
-           nb = MAX( GetBubbleDOFs(Element, p), Element % BDOFs )
-           p=CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0/ &
-                   (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+2 - AEPS)
+        p = pSolver % Def_Dofs(5,BodyId,6)
+        nb = pSolver % Def_Dofs(5,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF ( BDOFs > 0 ) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
 
            DO i=0,p-4
               DO j=0,p-i-4
@@ -2747,11 +2775,13 @@ CONTAINS
               CASE (1)
                  ! For each face calculate values of functions from index
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
-                 DO i=2,p-2
-                    DO j=2,p-i
+!                DO i=2,p-2
+!                   DO j=2,p-i
+                 DO i=0,p-2
+                    DO j=0,p-2
                        IF ( q >= SIZE(BasisDegree) ) CYCLE
                        q = q + 1
-                       BasisDegree(q) = i+j
+                       BasisDegree(q) = 2+i+j
                     END DO
                  END DO
 
@@ -2770,21 +2800,21 @@ CONTAINS
         END IF
 
         ! Bubbles of P Pyramid
-        IF (Element % BDOFs > 0) THEN 
+        p = pSolver % Def_Dofs(6,BodyId,6)
+        nb = pSolver % Def_Dofs(6,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF (BDOFs > 0) THEN 
            ! Get element p
-           p = Element % PDefs % p
-           nb = MAX( GetBubbleDOFs(Element, p), Element % BDOFs )
-           p=CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0/ &
-                   (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+2 - AEPS)
+           p = getEffectiveBubbleP(element,p,bdofs)
 
            ! Calculate value of bubble functions from indexes
-           ! i,j,k=0,..,p-4 i+j+k=0,..,p-4
-           DO i=0,p-4
-              DO j=0,p-i-4
-                 DO k=0,p-i-j-4
+           ! i,j,k=0,..,p-3 i+j+k=0,..,p-3
+           DO i=0,p-3
+              DO j=0,p-i-3
+                 DO k=0,p-i-j-3
                     IF ( q >= SIZE(BasisDegree)) CYCLE
                     q = q + 1
-                    BasisDegree(q) = 4+i+j+k
+                    BasisDegree(q) = 3+i+j+k
                  END DO
               END DO
            END DO
@@ -2807,12 +2837,6 @@ CONTAINS
               DO k=1,Edge % BDOFs
                  IF ( q >= SIZE(BasisDegree) ) CYCLE
                  q = q + 1
-
-                 ! Use basis compatible with pyramid if necessary
-                 ! @todo Correct this!
-                 IF (Edge % PDefs % pyramidQuad) THEN
-!                   CALL Fatal('ElementInfo','Pyramid compatible wedge edge basis NIY!')
-                 END IF
                  BasisDegree(q) = 1+k
               END DO
            END DO
@@ -2844,11 +2868,13 @@ CONTAINS
               CASE (3,4,5)
                  ! For each face calculate values of functions from index
                  ! pairs i,j=2,..,p-2 i+j=4,..,p
-                 DO i=2,p-2
-                    DO j=2,p-i
+!                DO i=2,p-2
+!                   DO j=2,p-i
+                 DO i=0,p-2
+                    DO j=0,p-2
                        IF ( q >= SIZE(BasisDegree) ) CYCLE
                        q = q + 1
-                       BasisDegree(q) = i+j
+                       BasisDegree(q) = 2+i+j
                     END DO
                  END DO
               END SELECT
@@ -2857,21 +2883,24 @@ CONTAINS
         END IF
 
         ! Bubbles of P Wedge
-        IF ( Element % BDOFs > 0 ) THEN
+        p = pSolver % Def_Dofs(7,BodyId,6)
+        nb = pSolver % Def_Dofs(7,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF ( BDOFs > 0 ) THEN
            ! Get p from element
-           p = Element % PDefs % P
-           nb = MAX( GetBubbleDOFs( Element, p ), Element % BDOFs )
-           p=CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0/ &
-                   (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+3 - AEPS)
-           
+           p = getEffectiveBubbleP(element,p,bdofs)
+
            ! For each bubble calculate value of basis function and its derivative
            ! for index pairs i,j=0,..,p-5 k=2,..,p-3 i+j+k=2,..,p-3
-           DO i=0,p-5
-              DO j=0,p-5-i
-                 DO k=2,p-3-i-j
+!          DO i=0,p-5
+!             DO j=0,p-5-i
+!                DO k=2,p-3-i-j
+           DO i=0,p-2
+              DO j=0,p-i-2
+                 DO k=0,p-i-j-2
                     IF ( q >= SIZE(BasisDegree) ) CYCLE
                     q = q + 1
-                    BasisDegree(q) = 3+i+j+k
+                    BasisDegree(q) = 2+i+j+k
                  END DO
               END DO
            END DO
@@ -2913,32 +2942,37 @@ CONTAINS
 
               ! For each face calculate values of functions from index
               ! pairs i,j=2,..,p-2 i+j=4,..,p
-              DO i=2,p-2
-                 DO j=2,p-i
+!             DO i=2,p-2
+!                DO j=2,p-i
+              DO i=0,p-2
+                 DO j=0,p-2
                     IF ( q >= SIZE(BasisDegree) ) CYCLE
                     q = q + 1
-                    BasisDegree(q) = i+j
+                    BasisDegree(q) = 2+i+j
                  END DO
               END DO
            END DO
         END IF
 
         ! Bubbles of p brick
-        IF ( Element % BDOFs > 0 ) THEN
+        p = pSolver % Def_Dofs(7,BodyId,6)
+        nb = pSolver % Def_Dofs(7,BodyId,5)
+        BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+        IF ( BDOFs > 0 ) THEN
            ! Get p from bubble DOFs 
-           p = Element % PDefs % P
-           nb = MAX( GetBubbleDOFs(Element, p), Element % BDOFs )
-           p=CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0/ &
-                   (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+4 - AEPS)
+           p = getEffectiveBubbleP(element,p,bdofs)
 
            ! For each bubble calculate value of basis function and its derivative
            ! for index pairs i,j,k=2,..,p-4, i+j+k=6,..,p
-           DO i=2,p-4
-              DO j=2,p-i-2
-                 DO k=2,p-i-j
+!          DO i=2,p-4
+!             DO j=2,p-i-2
+!                DO k=2,p-i-j
+           DO i=0,p-2
+              DO j=0,p-2
+                 DO k=0,p-2
                     IF ( q >= SIZE(BasisDegree) ) CYCLE
                     q = q + 1
-                    BasisDegree(q) = i+j+k
+                    BasisDegree(q) = 2+i+j+k
                  END DO
               END DO
            END DO
@@ -3328,7 +3362,7 @@ CONTAINS
                  END IF
 
                  ! Polynomial degree of basis function to vector
-                 IF (degrees) BasisDegree(q) = i+j
+                 IF (degrees) BasisDegree(q) = 2+i+j
               END DO
            END DO bubbles_quad
         END IF
@@ -3504,7 +3538,7 @@ CONTAINS
                        END IF
                        
                        ! Polynomial degree of basis function to vector
-                       IF (degrees) BasisDegree(q) = i+j
+                       IF (degrees) BasisDegree(q) = 2+i+j
                     END DO
                  END DO
 
@@ -3664,14 +3698,14 @@ CONTAINS
                        IF ( q >= SIZE(Basis) ) EXIT faces_prism
                        q = q + 1
 
-                       Basis(q) = WedgeFacePBasis(F,j,i,u,v,w,direction)
-                       dLBasisdx(q,:) = dWedgeFacePBasis(F,j,i,u,v,w,direction)
+                       Basis(q) = WedgeFacePBasis(F,i,j,u,v,w,direction)
+                       dLBasisdx(q,:) = dWedgeFacePBasis(F,i,j,u,v,w,direction)
                        IF(Compute2ndDerivatives) THEN
-                          ddLBasisddx(q,:,:) = ddWedgeFacePBasis(F,j,i,u,v,w,direction)
+                          ddLBasisddx(q,:,:) = ddWedgeFacePBasis(F,i,j,u,v,w,direction)
                        END IF
 
                        ! Polynomial degree of basis function to vector
-                       IF (degrees) BasisDegree(q) = i+j
+                       IF (degrees) BasisDegree(q) = 2+i+j
                     END DO
                  END DO
               END SELECT
@@ -3703,7 +3737,7 @@ CONTAINS
                     END IF
 
                     ! Polynomial degree of basis function to vector
-                    IF (degrees) BasisDegree(q) = 3+i+j+k
+                    IF (degrees) BasisDegree(q) = 2+i+j+k
                  END DO
               END DO
            END DO bubbles_prism
@@ -3783,7 +3817,7 @@ CONTAINS
                         ddLBasisddx(q,:,:) = ddBrickFacePBasis(F,i,j,u,v,w,direction)
                       END IF
                       ! Polynomial degree of basis function to vector
-                      IF (degrees) BasisDegree(q) = i+j
+                      IF (degrees) BasisDegree(q) = 2+i+j
                    END DO
                 END DO
            END DO faces_brick
@@ -3811,7 +3845,7 @@ CONTAINS
                    END IF
                     
                    ! Polynomial degree of basis function to vector
-                   IF (degrees) BasisDegree(q) = 3+i+j+k
+                   IF (degrees) BasisDegree(q) = 2+i+j+k
                 END DO
              END DO
           END DO bubbles_brick
@@ -4075,7 +4109,7 @@ CONTAINS
 ! functions, even for purely nodal elements. Support for standard nodal elements
 ! will be implemented in the future. 
 !------------------------------------------------------------------------------
-   FUNCTION ElementInfoVec( Element, Nodes, nc, u, v, w, detJ, nbmax, Basis, dBasisdx ) RESULT(retval)
+   FUNCTION ElementInfoVec( Element, Nodes, nc, u, v, w, detJ, nbmax, Basis, dBasisdx, USolver ) RESULT(retval)
 !------------------------------------------------------------------------------
      IMPLICIT NONE
 
@@ -4089,6 +4123,7 @@ CONTAINS
      INTEGER, INTENT(IN) :: nbmax          !< Maximum number of basis functions to compute
      REAL(KIND=dp) CONTIG :: Basis(:,:)    !< Basis function values at (u,v,w)
      REAL(KIND=dp) CONTIG, OPTIONAL :: dBasisdx(:,:,:)    !< Global first derivatives of basis functions at (u,v,w)
+     TYPE(Solver_t), TARGET, OPTIONAL :: USolver
      LOGICAL :: retval                             !< If .FALSE. element is degenerate. or if local storage allocation fails
 
      ! Internal work arrays (always needed)
@@ -4127,7 +4162,7 @@ CONTAINS
 
      IF(ASSOCIATED(Element % PDefs) .OR. Element % Type % BasisFunctionDegree<2) THEN
        retval =  ElementInfoVec_ComputePElementBasis(Element,Nodes,nc,u,v,w,detJ,nbmax,Basis,&
-             uWrk,vWrk,wWrk,BasisWrk,dBasisdxWrk,DetJWrk,LtoGmapsWrk,dBasisdx)
+             uWrk,vWrk,wWrk,BasisWrk,dBasisdxWrk,DetJWrk,LtoGmapsWrk,dBasisdx, USolver)
      ELSE
        retval = .TRUE.
        n    = Element % TYPE % NumberOfNodes
@@ -4180,7 +4215,7 @@ CONTAINS
    END FUNCTION ElementInfoVec
      
    FUNCTION ElementInfoVec_ComputePElementBasis(Element, Nodes, nc, u, v, w, DetJ, nbmax, Basis, &
-      uWrk, vWrk, wWrk, BasisWrk, dBasisdxWrk, DetJWrk, LtoGmapsWrk, dBasisdx) RESULT(retval)
+      uWrk, vWrk, wWrk, BasisWrk, dBasisdxWrk, DetJWrk, LtoGmapsWrk, dBasisdx, USolver) RESULT(retval)
      IMPLICIT NONE
      TYPE(Element_t), TARGET :: Element    !< Element structure
      TYPE(Nodes_t)   :: Nodes              !< Element nodal coordinates.
@@ -4198,7 +4233,8 @@ CONTAINS
      REAL(KIND=dp) :: DetJWrk(VECTOR_BLOCK_LENGTH)
      REAL(KIND=dp) :: LtoGMapsWrk(VECTOR_BLOCK_LENGTH,3,3)
      REAL(KIND=dp) CONTIG, OPTIONAL :: dBasisdx(:,:,:)    !< Global first derivatives of basis functions at (u,v,w)
-     LOGICAL :: retval                             !< If .FALSE. element is degenerate. or if local storage allocation fails
+     TYPE(Solver_t), TARGET, OPTIONAL :: USolver
+     LOGICAL :: retval                    !< If .FALSE. element is degenerate. or if local storage allocation fails
 
 
      !------------------------------------------------------------------------------
@@ -4209,15 +4245,33 @@ CONTAINS
            EdgeDirection(H1Basis_MaxPElementEdgeNodes,H1Basis_MaxPElementEdges), &
            FaceDirection(H1Basis_MaxPElementFaceNodes,H1Basis_MaxPElementFaces)
 
-     INTEGER :: cdim, dim, i, j, k, l, ll, lln, ncl, ip, n, p, nb, &
-           nbp, nbq, nbdxp, allocstat, ncpad, EdgeMaxDegree, FaceMaxDegree
+     INTEGER :: cdim, dim, i, j, k, l, ll, lln, ncl, ip, n, p, nb, bdofs, &
+           nbp, nbq, nbdxp, allocstat, ncpad, EdgeMaxDegree, FaceMaxDegree, BodyId
 
+     TYPE(Solver_t), POINTER :: pSolver
+     TYPE(Element_t), POINTER :: Parent
 
      LOGICAL :: invertBubble, elem
  
 !DIR$ ATTRIBUTES ALIGN:64::EdgeDegree, FaceDegree
 !DIR$ ATTRIBUTES ALIGN:64::EdgeDirection, FaceDirection
 !DIR$ ASSUME_ALIGNED uWrk:64, vWrk:64, wWrk:64, BasisWrk:64, dBasisdxWrk:64, DetJWrk:64, LtoGMapsWrk:64
+
+     IF( PRESENT( USolver ) ) THEN
+       pSolver => USolver
+     ELSE
+       pSolver => CurrentModel % Solver
+     END IF
+
+     BodyId = Element % BodyId
+     IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
+       Parent => Element % PDefs % LocalParent
+       IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
+     END IF
+     IF (BodyId==0) THEN
+       CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
+       BodyId = 1
+     END IF
 
      retval = .TRUE.
      n    = Element % TYPE % NumberOfNodes
@@ -4255,12 +4309,15 @@ CONTAINS
          CALL H1Basis_dLineNodal(ncl, uWrk, nbmax, dBasisdxWrk, nbdxp)
 
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
+         p = pSolver % Def_Dofs(2,BodyId,6)
+         nb = pSolver % Def_Dofs(2,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
+
            ! For first round of blocked loop, compute edge direction
            IF (ll==1) THEN
-             ! Compute P from bubble dofs
-             P = Element % BDOFS + 1
-
              IF (Element % PDefs % isEdge .AND. &
                    Element % NodeIndexes(1)> Element % NodeIndexes(2)) THEN
                invertBubble = .TRUE.
@@ -4301,13 +4358,16 @@ CONTAINS
          END IF
 
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
+         p = pSolver % Def_Dofs(3,BodyId,6)
+         nb = pSolver % Def_Dofs(3,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
+
            ! For first round of blocked loop, compute polynomial degrees and 
            ! edge directions
            IF (ll==1) THEN
-             ! Compute P from bubble dofs
-             P = CEILING( ( 3.0d0+SQRT(1.0d0+8.0d0*(Element % BDOFS)) ) / 2.0d0 - AEPS)
-
              IF (Element % PDefs % isEdge) THEN
                ! Get 2D face direction
                CALL H1Basis_GetFaceDirection(Element % Type % ElementCode, &
@@ -4353,19 +4413,25 @@ CONTAINS
          END IF
 
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
+         p = pSolver % Def_Dofs(4,BodyId,6)
+         nb = pSolver % Def_Dofs(4,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
+
+           IF(nbmax-nbp<getBubbleDOFs(Element,p)) THEN
+             CALL Fatal("ElementInfoVec", &
+               "Quad bubble scheme has changed, number of bubbles is now (p-1)^2 (1,4,9,16,25,...)")
+           END IF
+
            ! For first round of blocked loop, compute polynomial degrees and 
            ! edge directions
            IF (ll==1) THEN
-             ! Compute P from bubble dofs
-             P = CEILING( ( 5.0d0+SQRT(1.0d0+8.0d0*(Element % BDOFS)) ) / 2.0d0 - AEPS )
-
              IF (Element % PDefs % isEdge) THEN
                ! Get 2D face direction
                CALL H1Basis_GetFaceDirection(Element % Type % ElementCode, &
-                     1, &
-                     Element % NodeIndexes, &
-                     FaceDirection)
+                     1,  Element % NodeIndexes,  FaceDirection)
              END IF
            END IF
 
@@ -4384,6 +4450,7 @@ CONTAINS
        CASE (504)
          ! Compute nodal basis
          CALL H1Basis_TetraNodalP(ncl, uWrk, vWrk, wWrk, nbmax, BasisWrk, nbp)
+
          ! Compute local first derivatives
          CALL H1Basis_dTetraNodalP(ncl, uWrk, vWrk, wWrk, nbmax, dBasisdxWrk, nbdxp)
 
@@ -4471,12 +4538,11 @@ CONTAINS
          END IF
 
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
-           ! Compute P based on bubble dofs
-           nb = Element % BDOFs
-           p = CEILING( 1/3._dp*(81*nb+3*SQRT(-3._dp+729*nb**2))**(1/3._dp) + &
-                   1d0/(81*nb+3*SQRT(-3._dp+729*nb**2))**(1/3._dp)+2 - AEPS )
-
+         p = pSolver % Def_Dofs(5,BodyId,6)
+         nb = pSolver % Def_Dofs(5,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
            CALL H1Basis_TetraBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, BasisWrk, nbp)
            CALL H1Basis_dTetraBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, dBasisdxWrk, nbdxp)
          END IF
@@ -4552,8 +4618,8 @@ BLOCK
                  
                     ! For each face calculate values of functions from index
                     ! pairs i,j=2,..,p-2 i+j=4,..,p
-                    DO i=2,p-2
-                       DO j=2,p-i
+                    DO i=0,p-2
+                       DO j=0,p-2
                           IF ( q >= SIZE(BasisWrk,2) ) CYCLE
                           q = q + 1
                        
@@ -4585,26 +4651,25 @@ BLOCK
            END IF
 
            ! Bubbles of P Pyramid
-           IF (Element % BDOFs > 0) THEN 
-              ! Get element p
-              p = Element % PDefs % p
-              nb = MAX( GetBubbleDOFs(Element, p), Element % BDOFs )
-              p=CEILING(1/3d0*(81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+1d0/ &
-                      (81*nb+3*SQRT(-3d0+729*nb**2))**(1/3d0)+2 - AEPS)
+           p = pSolver % Def_Dofs(6,BodyId,6)
+           nb = pSolver % Def_Dofs(6,BodyId,5)
+           BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+           IF (BDOFs > 0) THEN
+             p = getEffectiveBubbleP(element,p,bdofs)
 
-              ! Calculate value of bubble functions from indexes
-              ! i,j,k=0,..,p-4 i+j+k=0,..,p-4
-              DO i=0,p-4
-                 DO j=0,p-i-4
-                    DO k=0,p-i-j-4
-                       IF ( q >= SIZE(BasisWrk,2)) CYCLE
-                       q = q + 1
- 
-                       BasisWrk(l,q) = PyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
-                       dBasisdxWrk(l,q,:) = dPyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
-                    END DO
-                 END DO
-              END DO
+             ! Calculate value of bubble functions from indexes
+             ! i,j,k=0,..,p-4 i+j+k=0,..,p-4
+             DO i=0,p-2
+                DO j=0,p-i-2
+                   DO k=0,p-i-j-2
+                      IF ( q >= SIZE(BasisWrk,2)) CYCLE
+                      q = q + 1
+
+                      BasisWrk(l,q) = PyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
+                      dBasisdxWrk(l,q,:) = dPyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
+                   END DO
+                END DO
+             END DO
            END IF
          END DO
          
@@ -4634,6 +4699,7 @@ END BLOCK
              IF(nbmax >= nbq) THEN
                CALL H1Basis_WedgeEdgeP(ncl, uWrk, vWrk, wWrk, EdgeDegree, nbmax, BasisWrk, nbp, &
                      EdgeDirection)
+
                CALL H1Basis_dWedgeEdgeP(ncl, uWrk, vWrk, wWrk, EdgeDegree, nbmax, dBasisdxWrk, nbdxp, &
                      EdgeDirection)
              END IF
@@ -4659,8 +4725,8 @@ END BLOCK
              END DO
              ! Square faces
              DO i=3,5
-               DO j=2,FaceDegree(i)-2
-                 nbq = nbq + MAX(FaceDegree(i)-j-1,0)
+               DO j=0,FaceDegree(i)-2
+                 nbq = nbq + MAX(FaceDegree(i)-1,0)
                END DO
              END DO
              
@@ -4669,18 +4735,18 @@ END BLOCK
                      FaceDirection)
                CALL H1Basis_dWedgeFaceP(ncl, uWrk, vWrk, wWrk, FaceDegree, nbmax, dBasisdxWrk, nbdxp, &
                      FaceDirection)
+else
+stop 'w'
              END IF
            END IF
          END IF
 
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
-           ! Compute P from bubble dofs
-           P=CEILING(1/3d0*(81*(Element % BDOFS) + &
-                 3*SQRT(-3d0+729*(Element % BDOFS)**2))**(1/3d0) + &
-                 1d0/(81*(Element % BDOFS)+ &
-                 3*SQRT(-3d0+729*(Element % BDOFS)**2))**(1/3d0)+3 - AEPS)
-
+         p = pSolver % Def_Dofs(7,BodyId,6)
+         nb = pSolver % Def_Dofs(7,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
            CALL H1Basis_WedgeBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, BasisWrk, nbp)
            CALL H1Basis_dWedgeBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, dBasisdxWrk, nbdxp)
          END IF
@@ -4741,11 +4807,17 @@ END BLOCK
 
          
          ! Element bubble functions
-         IF (Element % BDOFS > 0) THEN 
-           ! Compute P from bubble dofs
-           P=CEILING(1/3d0*(81*Element % BDOFS + &
-                 3*SQRT(-3d0+729*Element % BDOFS**2))**(1/3d0) + &
-                 1d0/(81*Element % BDOFS+3*SQRT(-3d0+729*Element % BDOFS**2))**(1/3d0)+4 - AEPS)
+         p = pSolver % Def_Dofs(8,BodyId,6)
+         nb = pSolver % Def_Dofs(8,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
+
+           IF(nbmax-nbp<getBubbleDOFs(Element,p)) THEN
+             CALL Fatal("ElementInfoVec", &
+                "Brick bubble scheme has changed, number of bubbles is now (p-1)^3 (1,8,27,64,125,...)")
+           END IF
+
            CALL H1Basis_BrickBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, BasisWrk, nbp)
            CALL H1Basis_dBrickBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, dBasisdxWrk, nbdxp)
          END IF

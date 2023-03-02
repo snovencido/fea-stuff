@@ -58,5 +58,5 @@ Boundary Condition 1
 End
 
 
-Solver 2 :: Reference Norm = Real 0.75409042E-01
+Solver 2 :: Reference Norm = Real 6.62224093E-02
 RUN

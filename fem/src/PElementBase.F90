@@ -616,11 +616,6 @@ MODULE PElementBase
       dNa = dQuadNodalPBasis(nodes(1),u,v)
       dNb = dQuadNodalPBasis(nodes(2),u,v)
 
-      ! For inverted edges swap direction
-      IF (invert) THEN
-        swap=nodes(1); nodes(1)=nodes(2); nodes(2)=swap
-      END IF
-
       ! Affine functions and their derivatives for edge direction
       La  = QuadL(nodes(1),u,v)
       Lb  = QuadL(nodes(2),u,v)
@@ -630,6 +625,11 @@ MODULE PElementBase
 
       PhiPar = Lb-La
       dPhiPar = dLb-dLa
+
+      IF(Invert) THEN
+        PhiPar = -PhiPar
+        dPhiPar = -dPhiPar
+      END IF
 
       ! Get value of edge function
       vPhi  = VarPhi(i,Phipar)
@@ -4427,6 +4427,7 @@ MODULE PElementBase
       ELSE
         local(1:4) = localNumbers(1:4)
       END IF
+
 
       ! Set sign of w for faces 1 and 2
       SELECT CASE (face)

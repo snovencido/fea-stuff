@@ -181,5 +181,5 @@ Boundary Condition 4
   U 4 = Real 0
 End
 
-Solver 1 :: Reference Norm = Real 9.73304396E-03
+Solver 1 :: Reference Norm = Real 7.69886445E-03
 Solver 1 :: Reference Norm Tolerance = Real 1.0E-5

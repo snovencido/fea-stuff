@@ -74,7 +74,7 @@ Boundary Condition 1
   T=Real 0
 End
 
-Solver 1 :: Reference Norm = Real 0.74347461e-2
+Solver 1 :: Reference Norm = Real 5.12608068E-03
 RUN
 
 

@@ -46,5 +46,5 @@ Boundary Condition 1
   Potential = Real 0
 End
 
-Solver 1 :: Reference Norm = Real 0.223544023689E-01
+Solver 1 :: Reference Norm = Real 0.19674375E-01
 RUN
