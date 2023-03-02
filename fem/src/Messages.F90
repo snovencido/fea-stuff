@@ -49,7 +49,6 @@ MODULE Messages
 #else
 #define stdout 6
 #endif
-   
    IMPLICIT NONE
    
    CHARACTER(LEN=512) :: Message = ' '
@@ -64,7 +63,7 @@ MODULE Messages
    
    INTEGER, PARAMETER :: EXIT_OK=0, EXIT_ERROR=1
 
-CONTAINS
+ CONTAINS
 
 !-----------------------------------------------------------------------
 !> Prints information on the standard output if the requested or 
@@ -275,6 +274,7 @@ CONTAINS
      SAVE nadv1
 
 !-----------------------------------------------------------------------
+
      IF ( .NOT. OutputLevelMask(0) ) STOP EXIT_ERROR
 
      nadv = .FALSE.
