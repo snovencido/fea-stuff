@@ -786,8 +786,11 @@ MODULE PElementBase
       Lb = QuadL(localNumbers(2),u,v)
       Lc = QuadL(localNumbers(4),u,v)
 
+      Pa = QuadNodalPBasis(LocalNumbers(1),u,v)
+      Pb = QuadNodalPBasis(LocalNumbers(3),u,v)
+
       ! Calculate value of function from general form
-      value = Phi(i+2,Lb-La)*Phi(j+2,Lc-La)
+      value = Pa*Pb*LegendreP(i,Lb-La)*LegendreP(j,Lc-La)
     END FUNCTION QuadBubblePBasis
 
 
@@ -820,8 +823,8 @@ MODULE PElementBase
       INTEGER, INTENT(IN) :: i,j
       REAL (KIND=dp), INTENT(IN) :: u,v
       INTEGER, OPTIONAL :: localNumbers(4)
-      REAL(Kind=dp) :: La, Lb, Lc
-      REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, grad
+      REAL(Kind=dp) :: La, Lb, Lc, Pa, Pb, Legi, Legj
+      REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, grad, dPa, dPb, dLegi, dLegj
       
       ! Calculate value of function without direction and return
       ! if local numbering not present
@@ -840,8 +843,20 @@ MODULE PElementBase
       dLb = dQuadL(localNumbers(2),u,v)
       dLc = dQuadL(localNumbers(4),u,v)
 
-      grad = dPhi(i+2,Lb-La)*(dLb-dLa)*Phi(j+2,Lc-La) + &
-             Phi(i+2,Lb-La)*dPhi(j+2,Lc-La)*(dLc-dLa)
+      Pa = QuadNodalPBasis(LocalNumbers(1),u,v)
+      Pb = QuadNodalPBasis(LocalNumbers(3),u,v)
+
+      dPa = dQuadNodalPBasis(LocalNumbers(1),u,v)
+      dPb = dQuadNodalPBasis(LocalNumbers(3),u,v)
+
+      Legi = LegendreP(i,Lb-La)
+      Legj = LegendreP(j,Lc-La)
+
+      dLegi = dLegendreP(i,Lb-La)*(dLb-dLa)
+      dLegj = dLegendreP(j,Lc-La)*(dLc-dLa)
+
+      grad = dPa*Pb*Legi*Legj + Pa*dPb*Legi*Legj + &
+             Pa*Pb*dLegi*Legj + Pa*Pb*Legi*dLegj
     END FUNCTION dQuadBubblePBasis
 
 
@@ -875,9 +890,9 @@ MODULE PElementBase
       REAL (KIND=dp), INTENT(IN) :: u,v
       INTEGER, OPTIONAL :: localNumbers(4)
       INTEGER :: p,q
-      REAL(Kind=dp) :: La, Lb, Lc, PhiI, PhiJ
-      REAL(Kind=dp), DIMENSION(2,2) :: ddPhiI, ddPhiJ, grad
-      REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, dPhiI, dPhiJ
+      REAL(Kind=dp) :: La, Lb, Lc, Legi, Legj, Pa, Pb
+      REAL(Kind=dp), DIMENSION(2,2) :: ddLegi, ddLegj, grad, ddPa, ddPb
+      REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, dLegi, dLegj, dPa, dPb
       
       ! Calculate value of function without direction and return
       ! if local numbering not present
@@ -898,22 +913,70 @@ MODULE PElementBase
       dLb = dQuadL(localNumbers(2),u,v)
       dLc = dQuadL(localNumbers(4),u,v)
 
-      dPhiI = dPhi(i+2,Lb-La)*(dLb-dLa)
-      dPhiJ = dPhi(j+2,Lb-La)*(dLc-dLa)
+      Pa = QuadNodalPBasis(localNumbers(1),u,v)
+      Pb = QuadNodalPBasis(localNumbers(3),u,v)
+
+      dPa = dQuadNodalPBasis(localNumbers(1),u,v)
+      dPb = dQuadNodalPBasis(localNumbers(3),u,v)
+
+      ddPa = ddQuadNodalPBasis(localNumbers(1),u,v)
+      ddPb = ddQuadNodalPBasis(localNumbers(3),u,v)
+
+      Legi = LegendreP(i,Lb-La)
+      Legj = LegendreP(j,Lc-La)
+
+      dLegi = dLegendreP(i,Lb-La)*(dLb-dLa)
+      dLegj = dLegendreP(j,Lc-La)*(dLc-dLa)
+
       DO p=1,2
         DO q=p,2
-          ddPhiI(p,q) = ddPhi(i+2,Lb-La)*(dLb(p)-dLa(p))*(dLb(q)-dLa(q))
-          ddPhiJ(p,q) = ddPhi(j+2,Lc-La)*(dLc(p)-dLa(p))*(dLc(q)-dLa(q))
+          ddLegi(p,q) = ddLegendreP(i,Lb-La)*(dLb(p)-dLa(p))*(dLb(q)-dLa(q))
+          ddLegj(p,q) = ddLegendreP(j,Lc-La)*(dLc(p)-dLa(p))*(dLc(q)-dLa(q))
         END DO
       END DO
 
-!     grad = dPhi(i+2,Lb-La)*(dLb-dLa)*Phi(j+2,Lc-La) + &
-!            Phi(i+2,Lb-La)*dPhi(j+2,Lc-La)*(dLc-dLa)
+!     grad = dPa*Pb*Legi*Legj + Pa*dPb*Legi*Legj + &
+!            Pa*Pb*dLegi*Legj + Pa*Pb*Legi*dLegj
 
-      grad(1,1) = ddPhiI(1,1)*PhiJ  + 2*dPhiI(1)*dPhiJ(1) + PhiI*ddPhiJ(1,1)
-      grad(1,2) = ddPhiI(1,2)*PhiJ  + dPhiI(2)*dPhiJ(1)+dPhiI(1)*dPhiJ(2) + PhiI*ddPhiJ(1,2)
-      grad(2,2) = ddPhiI(2,2)*PhiJ  + 2*dPhiI(2)*dPhiJ(2) + PhiI*ddPhiJ(2,2)
+      grad = 0
+      grad(1,1) = grad(1,1) + ddPa(1,1)*Pb*Legi*Legj + dPa(1)*dPb(1)*Legi*Legj + &
+                  dPa(1)*Pb*dLegi(1)*Legj + dPa(1)*Pb*Legi*dLegj(1)
+
+      grad(1,1) = grad(1,1) + dPa(1)*dPb(1)*Legi*Legj + Pa*ddPb(1,1)*Legi*Legj + &
+                  Pa*dPb(1)*dLegi(1)*Legj + Pa*dPb(1)*Legi*dLegj(1)
+
+      grad(1,1) = grad(1,1) + dPa(1)*Pb*dLegi(1)*Legj + Pa*dPb(1)*dLegi(1)*Legj + &
+                  Pa*Pb*ddLegi(1,1)*Legj + Pa*Pb*dLegi(1)*dLegj(1)
+
+      grad(1,1) = grad(1,1) + dPa(1)*Pb*Legi*dLegj(1) + Pa*dPb(1)*Legi*dLegj(1) + &
+                  Pa*Pb*dLegi(1)*dLegj(1) + Pa*Pb*Legi*ddLegj(1,1)
+
+      grad(1,2) = grad(1,2) + ddPa(1,2)*Pb*Legi*Legj + dPa(2)*dPb(1)*Legi*Legj + &
+                  dPa(2)*Pb*dLegi(1)*Legj + dPa(2)*Pb*Legi*dLegj(1)
+
+      grad(1,2) = grad(1,2) + dPa(1)*dPb(2)*Legi*Legj + Pa*ddPb(1,2)*Legi*Legj + &
+                  Pa*dPb(2)*dLegi(1)*Legj + Pa*dPb(2)*Legi*dLegj(1)
+
+      grad(1,2) = grad(1,2) + dPa(1)*Pb*dLegi(2)*Legj + Pa*dPb(1)*dLegi(2)*Legj + &
+                  Pa*Pb*ddLegi(1,2)*Legj + Pa*Pb*dLegi(2)*dLegj(1)
+
+      grad(1,2) = grad(1,2) + dPa(1)*Pb*Legi*dLegj(2) + Pa*dPb(1)*Legi*dLegj(2) + &
+                  Pa*Pb*dLegi(1)*dLegj(2) + Pa*Pb*Legi*ddLegj(1,2)
+
+      grad(2,2) = grad(2,2) + ddPa(2,2)*Pb*Legi*Legj + dPa(2)*dPb(2)*Legi*Legj + &
+                  dPa(2)*Pb*dLegi(2)*Legj + dPa(2)*Pb*Legi*dLegj(2)
+
+      grad(2,2) = grad(2,2) + dPa(2)*dPb(2)*Legi*Legj + Pa*ddPb(2,2)*Legi*Legj + &
+                  Pa*dPb(2)*dLegi(2)*Legj + Pa*dPb(2)*Legi*dLegj(2)
+
+      grad(2,2) = grad(2,2) + dPa(2)*Pb*dLegi(2)*Legj + Pa*dPb(2)*dLegi(2)*Legj + &
+                  Pa*Pb*ddLegi(2,2)*Legj + Pa*Pb*dLegi(2)*dLegj(2)
+
+      grad(2,2) = grad(2,2) + dPa(2)*Pb*Legi*dLegj(2) + Pa*dPb(2)*Legi*dLegj(2) + &
+                  Pa*Pb*dLegi(2)*dLegj(2) + Pa*Pb*Legi*ddLegj(2,2)
+
       grad(2,1) = grad(1,2)
+
     END FUNCTION ddQuadBubblePBasis
 
 

@@ -947,8 +947,9 @@ CONTAINS
     INTEGER, INTENT(IN), OPTIONAL :: localNumbers(4)
 
     INTEGER :: i,j,k
-    REAL(KIND=dp) :: La, Lb, Lc
+    REAL(KIND=dp) :: La, Lb, Lc, Pa, Pb
 !DIR$ ASSUME_ALIGNED u:64, v:64, fval:64
+
 
     ! Calculate value of function without direction and return
     ! if local numbering not present
@@ -963,17 +964,20 @@ CONTAINS
         nbasis = nbasis + pmax - 1
       END DO
     ELSE
-      DO i=2,pmax
-        DO j=2,pmax
-          !_ELMER_OMP_SIMD PRIVATE(La,Lb,Lc)
+      DO i=0,pmax-2
+        DO j=0,pmax-2
+          !_ELMER_OMP_SIMD PRIVATE(La,Lb,Lc,Pa,Pb)
           DO k=1,nvec
             ! Directed quad bubbles
             La = H1Basis_QuadL(localNumbers(1),u(k),v(k))
             Lb = H1Basis_QuadL(localNumbers(2),u(k),v(k))
             Lc = H1Basis_QuadL(localNumbers(4),u(k),v(k))
 
+            Pa = fval(k,localNumbers(1))
+            Pb = fval(k,localNumbers(3))
+
             ! Calculate value of function from the general form
-            fval(k,nbasis+j-1) = H1Basis_Phi(i,Lb-La)*H1Basis_Phi(j,Lc-La)
+            fval(k,nbasis+j+1) = Pa*Pb*H1Basis_LegendreP(i,Lb-La)*H1Basis_LegendreP(j,Lc-La)
           END DO
         END DO
         nbasis = nbasis + pmax - 1
@@ -992,9 +996,10 @@ CONTAINS
     INTEGER, INTENT(INOUT) :: nbasis
     INTEGER, INTENT(IN), OPTIONAL :: localNumbers(4)
 
-    INTEGER :: i,j,k
-    REAL(KIND=dp) :: La, Lb, Lc
-    REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, dLbdLa, dLcdLa
+    INTEGER :: i,j,k, nnb
+    REAL(KIND=dp) :: La, Lb, Lc, Legi, Legj, Pa, Pb
+    REAL(Kind=dp), DIMENSION(2) :: dLa, dLb, dLc, dLbdLa, dLcdLa, dLegi,dLegj, dPa,dPb
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax) :: N
 !DIR$ ASSUME_ALIGNED u:64, v:64, grad:64
 
     IF (.NOT. PRESENT(localNumbers)) THEN
@@ -1011,27 +1016,35 @@ CONTAINS
         nbasis = nbasis + pmax - 1
       END DO
     ELSE
+      nnb = 0; CALL H1Basis_QuadNodal(nvec, u, v, nbasismax, n, nnb )
+
       ! Numbering present, so use it
       dLa = H1Basis_dQuadL(localNumbers(1))
       dLb = H1Basis_dQuadL(localNumbers(2))
       dLc = H1Basis_dQuadL(localNumbers(4))
 
-      dLBdLa = dLb-dLa
-      dLcdLa = dLc-dLa
-
-      DO i=2,pmax
-        DO j=2,pmax
-          !_ELMER_OMP_SIMD PRIVATE(La,Lb,Lc)
+      DO i=0,pmax-2
+        DO j=0,pmax-2
+          !_ELMER_OMP_SIMD PRIVATE(La,Lb,Lc,Legi,Legj,dLegi,dLegj,Pa,Pb,dPa,dPb)
           DO k=1,nvec
             La = H1Basis_QuadL(localNumbers(1),u(k),v(k))
             Lb = H1Basis_QuadL(localNumbers(2),u(k),v(k))
             Lc = H1Basis_QuadL(localNumbers(4),u(k),v(k))
 
-            grad(k,nbasis+j-1,1) = H1Basis_dPhi(i,Lb-La)*(dLbdLa(1))*H1Basis_Phi(j,Lc-La) + &
-                    H1Basis_Phi(i,Lb-La)*H1Basis_dPhi(j,Lc-La)*(dLcdLa(1))
+            Pa = N(k,localNumbers(1))
+            Pb = N(k,localNumbers(3))
 
-            grad(k,nbasis+j-1,2) = H1Basis_dPhi(i,Lb-La)*(dLbdLa(2))*H1Basis_Phi(j,Lc-La) + &
-                    H1Basis_Phi(i,Lb-La)*H1Basis_dPhi(j,Lc-La)*(dLcdLa(2))
+            dPa = grad(k,localNumbers(1),1:2)
+            dPb = grad(k,localNumbers(3),1:2)
+
+            Legi = H1Basis_LegendreP(i,Lb-La)
+            Legj = H1Basis_LegendreP(j,Lc-La)
+
+            dLegi = H1Basis_dLegendreP(i,Lb-La)*(dLb-dLa)
+            dLegj = H1Basis_dLegendreP(j,Lc-La)*(dLc-dLa)
+
+            grad(k,nbasis+j+1,1:2) = dPa*Pb*Legi*Legj + Pa*dPb*Legi*Legj + &
+                                   Pa*Pb*dLegi*Legj + Pa*Pb*Legi*dLegj
           END DO
         END DO
         nbasis = nbasis + pmax - 1
@@ -2359,6 +2372,85 @@ CONTAINS
       nbasis = nbasis + MAX(pmax(i)-1,0)
     END DO
   END SUBROUTINE H1Basis_PyramidEdgeP
+
+  SUBROUTINE H1Basis_dPyramidEdgeP(nvec, u, v, w, pmax, nbasismax, grad, nbasis, edgedir)
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: nvec
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH), INTENT(IN) :: u, v, w
+    INTEGER, DIMENSION(:) CONTIG, INTENT(IN) :: pmax
+    INTEGER, INTENT(IN) :: nbasismax
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax,3), INTENT(INOUT) :: grad
+    INTEGER, INTENT(INOUT) :: nbasis
+    INTEGER, DIMENSION(:,:) CONTIG, INTENT(IN) :: edgedir
+
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax) :: n
+    REAL(KIND=dp) :: La, Lb, dLa(3), dLb(3), Na, Nb, dNa(3), dNb(3), Phi, dPhi(3)
+    INTEGER :: i,j,k,l, node1, node2, nnb
+!DIR$ ASSUME_ALIGNED u:64, v:64, w:64, fval:64
+
+    REAL(KIND=dp) :: s, sq2=SQRT(2.0_dp)
+
+    nnb=0; CALL H1Basis_PyramidNodalP(nvec, u, v, w, nbasismax, n, nnb)
+
+    DO i=1,4 ! square face
+      node1 = edgedir(1,i)
+      node2 = edgedir(2,i)
+
+      dLa = H1Basis_dPyramidL(node1)
+      dLb = H1Basis_dPyramidL(node2)
+
+      DO j=2,pmax(i)
+        !_ELMER_OMP_SIMD PRIVATE(La, Lb, Na, Nb, dNa, dNb, Phi, dPhi, s)
+        DO k=1,nvec
+          s = w(k)/sq2
+
+          Na = N(k,node1)
+          Nb = N(k,node2)
+          dNa = grad(k,node1,:)
+          dNb = grad(k,node2,:)
+
+          La = H1Basis_PyramidL(node1,u(k),v(k))
+          Lb = H1Basis_PyramidL(node2,u(k),v(k))
+
+          Phi = H1Basis_varPhi(j,Lb-La)
+          dPhi = H1Basis_dvarPhi(j,Lb-La)*(dLb-dLa)
+
+          grad(k,nbasis+j-1,:) = dNa*Nb*Phi + Na*dNb*Phi + Na*Nb*dPhi
+        END DO
+      END DO
+      nbasis = nbasis + MAX(pmax(i)-1,0)
+    END DO
+
+    DO i=5,8 ! triangular faces
+      Node1 = edgedir(1,i)
+      Node2 = edgedir(2,i)
+
+      dLa = H1Basis_dPyramidTL(node1)
+      dLb = H1Basis_dPyramidTL(node2)
+
+      DO j=2,pmax(i)
+        !_ELMER_OMP_SIMD PRIVATE(La, Lb, Na, Nb, dNa, dNb, Phi, dPhi, s)
+        DO k=1,nvec
+          s = w(k)/sq2
+
+          Na = N(k,node1)
+          Nb = N(k,node2)
+          dNa = grad(k,node1,:)
+          dNb = grad(k,node2,:)
+
+          La = H1Basis_PyramidL(node1,u(k),v(k))
+          Lb = H1Basis_PyramidL(node2,u(k),v(k))
+
+          Phi = H1Basis_varPhi(j,Lb-La)
+          dPhi = H1Basis_dvarPhi(j,Lb-La)*(dLb-dLa)
+
+          grad(k,nbasis+j-1,:) = dNa*Nb*Phi + Na*dNb*Phi + Na*Nb*dPhi
+        END DO
+      END DO
+      nbasis = nbasis + MAX(pmax(i)-1,0)
+    END DO
+  END SUBROUTINE H1Basis_dPyramidEdgeP
 
 
   SUBROUTINE H1Basis_BrickNodal(nvec, u, v, w, nbasismax, fval, nbasis)
