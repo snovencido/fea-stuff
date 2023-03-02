@@ -2895,12 +2895,12 @@ CONTAINS
 !          DO i=0,p-5
 !             DO j=0,p-5-i
 !                DO k=2,p-3-i-j
-           DO i=0,p-2
-              DO j=0,p-i-2
-                 DO k=0,p-i-j-2
+           DO i=0,p-3
+              DO j=0,p-i-3
+                 DO k=0,p-2
                     IF ( q >= SIZE(BasisDegree) ) CYCLE
                     q = q + 1
-                    BasisDegree(q) = 2+i+j+k
+                    BasisDegree(q) = 3+i+j+k
                  END DO
               END DO
            END DO
@@ -3722,11 +3722,9 @@ CONTAINS
            
            ! For each bubble calculate the value of basis function and its derivative
            ! for index pairs i,j=0,..,p-5 k=2,..,p-3 i+j+k=2,..,p-3
-           bubbles_prism: DO i=0,p-2
-              DO j=0,p-i-2
-                 DO k=0,p-i-j-2
-!             DO j=0,p-2
-!                DO k=0,p-2
+           bubbles_prism: DO i=0,p-3
+              DO j=0,p-i-3
+                 DO k=0,p-2
                     IF ( q >= SIZE(Basis) ) EXIT bubbles_prism
                     q = q + 1
 
@@ -4735,8 +4733,6 @@ END BLOCK
                      FaceDirection)
                CALL H1Basis_dWedgeFaceP(ncl, uWrk, vWrk, wWrk, FaceDegree, nbmax, dBasisdxWrk, nbdxp, &
                      FaceDirection)
-else
-stop 'w'
              END IF
            END IF
          END IF

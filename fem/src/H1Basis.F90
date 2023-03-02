@@ -2030,9 +2030,9 @@ CONTAINS
     REAL(KIND=dp) :: L1, L2, L3, s,t
 !DIR$ ASSUME_ALIGNED u:64, v:64, w:64, fval:64
 
-    DO i=0,pmax-2
-      DO j=0,pmax-2-i
-        DO k=0,pmax-2-i-j
+    DO i=0,pmax-3
+      DO j=0,pmax-3-i
+        DO k=0,pmax-2
           !_ELMER_OMP_SIMD PRIVATE(L1, L2, L3, s,t)
           DO l=1,nvec
             L1 = H1Basis_WedgeL(1,u(l),v(l))
@@ -2048,7 +2048,7 @@ CONTAINS
           END DO
         END DO
         ! nbasis = nbasis + (pmax-3-i-j)-2+1
-        nbasis = nbasis + MAX(pmax-1-i-j,0)
+        nbasis = nbasis + MAX(pmax-1,0)
       END DO
     END DO
   END SUBROUTINE H1Basis_WedgeBubbleP
@@ -2074,9 +2074,9 @@ CONTAINS
     dL2 = H1Basis_dWedgeL(2)
     dL3 = H1Basis_dWedgeL(3)
 
-    DO i=0,pmax-2
-      DO j=0,pmax-2-i
-        DO k=0,pmax-2-i-j
+    DO i=0,pmax-3
+      DO j=0,pmax-3-i
+        DO k=0,pmax-2
           !_ELMER_OMP_SIMD PRIVATE(L1, L2, L3, Legi, Legj, Legk, dLegi, dLegj, dLegk, s,t,ds,dt)
           DO l=1,nvec
 
@@ -2104,10 +2104,262 @@ CONTAINS
           END DO
         END DO
         ! nbasis = nbasis + (pmax-3-i-j)-2+1
-        nbasis = nbasis + MAX(pmax-1-i-j,0)
+        nbasis = nbasis + MAX(pmax-1,0)
       END DO
     END DO
   END SUBROUTINE H1Basis_dWedgeBubbleP
+
+!------------------------------------------------------------------------------
+!>     Pyramid nodal basis at points (u,v,w)
+!------------------------------------------------------------------------------
+  SUBROUTINE H1Basis_PyramidNodalP(nvec, u, v, w, nbasismax, fval, nbasis)
+    IMPLICIT NONE
+
+    ! Parameters
+    INTEGER, INTENT(IN) :: nvec
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH), INTENT(IN) :: u,v,w
+    ! Result
+    INTEGER, INTENT(IN) :: nbasismax
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax), INTENT(INOUT) :: fval
+    INTEGER, INTENT(INOUT) :: nbasis
+    INTEGER :: j
+!------------------------------------------------------------------------------
+    REAL(KIND=dp) :: s, sq2 = SQRT(2.0_dp)
+!DIR$ ASSUME_ALIGNED u:64, v:64, w:64, fval:64
+
+      !_ELMER_OMP_SIMD
+      DO j=1,nvec
+        s = w(j) / sq2
+        fval(j,nbasis+1) = (1-u(j)-v(j)-s+u(j)*v(j)/(1-s))/4
+        fval(j,nbasis+2) = (1+u(j)-v(j)-s-u(j)*v(j)/(1-s))/4
+        fval(j,nbasis+3) = (1+u(j)+v(j)-s+u(j)*v(j)/(1-s))/4
+        fval(j,nbasis+4) = (1-u(j)+v(j)-s-u(j)*v(j)/(1-s))/4
+        fval(j,nbasis+5) =  s
+      END DO
+      nbasis = nbasis + 5
+    END SUBROUTINE H1Basis_PyramidNodalP
+
+
+!------------------------------------------------------------------------------
+!>     Gradient of pyramids nodal basis at point (u,v,w)
+!------------------------------------------------------------------------------
+  SUBROUTINE H1Basis_dPyramidNodalP(nvec, u, v, w, nbasismax, grad, nbasis)
+    IMPLICIT NONE
+
+    ! Parameters
+    INTEGER, INTENT(IN) :: nvec
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH), INTENT(IN) :: u,v,w
+    ! Result
+    INTEGER, INTENT(IN) :: nbasismax
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax,3), INTENT(INOUT) :: grad
+    INTEGER, INTENT(INOUT) :: nbasis
+    INTEGER :: j
+    REAL(KIND=dp) :: s, sq2=SQRT(2.0_dp), sq42=4*SQRT(2._dp)
+!DIR$ ASSUME_ALIGNED u:64, v:64, w:64, fval:64
+
+      !_ELMER_OMP_SIMD
+      DO j=1,nvec
+        s = v(j)/(1-w(j)/sq2)
+        grad(j,nbasis+1,1) = (-1 + s)/4
+        grad(j,nbasis+2,1) = ( 1 - s)/4
+        grad(j,nbasis+3,1) = ( 1 + s)/4
+        grad(j,nbasis+4,1) = (-1 - s)/4
+        grad(j,nbasis+5,1) = 0
+      END DO
+
+      !_ELMER_OMP_SIMD
+      DO j=1,nvec
+        s = u(j)/(1-w(j)/sq2)
+        grad(j,nbasis+1,2) = (-1 + s)/4
+        grad(j,nbasis+2,2) = (-1 - s)/4
+        grad(j,nbasis+3,2) = ( 1 + s)/4
+        grad(j,nbasis+4,2) = ( 1 - s)/4
+        grad(j,nbasis+5,2) = 0
+      END DO
+
+      !_ELMER_OMP_SIMD
+      DO j=1,nvec
+        s = u(j)*v(j)/(1-w(j)/sq2)**2
+        grad(j,nbasis+1,3) = (-1 + s)/sq42
+        grad(j,nbasis+2,3) = (-1 - s)/sq42
+        grad(j,nbasis+3,3) = (-1 + s)/sq42
+        grad(j,nbasis+4,3) = (-1 - s)/sq42
+        grad(j,nbasis+5,3) = 1/sq2
+      END DO
+      nbasis = nbasis + 5
+  END SUBROUTINE H1Basis_dPyramidnodalP
+
+    ! Define affine coordinates for pyramid square face
+    FUNCTION H1Basis_PyramidL(which, u, v) RESULT(value)
+      IMPLICIT NONE
+
+      ! Parameters
+      INTEGER, INTENT(IN) :: which
+      REAL(KIND=dp), INTENT(IN) :: u,v
+      ! Variables
+      REAL(KIND=dp) :: value
+      
+      SELECT CASE (which)
+      CASE (1)
+         value = ((1-u)+(1-v))/2 
+      CASE (2)
+         value = ((1+u)+(1-v))/2
+      CASE (3)
+         value = ((1+u)+(1+v))/2
+      CASE (4)
+         value = ((1-u)+(1+v))/2
+      CASE DEFAULT
+         CALL Fatal('PElementBase::PyramidL','Unknown affine coordinate for square face')
+      END SELECT
+    END FUNCTION H1Basis_PyramidL
+
+    FUNCTION H1Basis_dPyramidL(which) RESULT(grad)
+      IMPLICIT NONE
+      
+      ! Parameters
+      INTEGER, INTENT(IN) :: which
+      ! Variables
+      REAL(KIND=dp) :: grad(3)
+
+      SELECT CASE (which)
+      CASE (1)
+         grad = [-1d0/2,-1d0/2, 0d0 ]
+      CASE (2)
+         grad = [ 1d0/2,-1d0/2, 0d0 ]
+      CASE (3)
+         grad = [ 1d0/2, 1d0/2, 0d0 ]
+      CASE (4)
+         grad = [-1d0/2, 1d0/2, 0d0 ]
+      CASE DEFAULT
+         CALL Fatal('PElementBase::dPyramidL','Unknown affine coordinate for square face')
+      END SELECT
+    END FUNCTION H1Basis_dPyramidL
+
+
+    FUNCTION H1Basis_PyramidTL(which, u, v, w) RESULT(value)
+      IMPLICIT NONE
+      
+      ! Parameters
+      INTEGER, INTENT(IN) :: which
+      REAL(KIND=dp), INTENT(IN) :: u,v,w 
+      ! Variables
+      REAL(KIND=dp) :: value,s
+      
+      value = 0
+      s = w/SQRT(2.0_dp)
+      SELECT CASE(which)
+      CASE (1)
+         value = (2-u-v-s)/2
+      CASE (2)
+         value = (2+u-v-s)/2
+      CASE (3)
+         value = (2+u+v-s)/2
+      CASE (4)
+         value = (2-u+v-s)/2
+      CASE (5)
+         value = s
+      CASE DEFAULT
+         CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
+      END SELECT
+    END FUNCTION H1Basis_PyramidTL
+
+    FUNCTION H1Basis_dPyramidTL(which) RESULT(grad)
+      IMPLICIT NONE
+      
+      ! Parameters
+      INTEGER, INTENT(IN) :: which
+      ! Variables
+      REAL(KIND=dp) :: grad(3),s
+      
+      grad = 0
+      SELECT CASE(which)
+      CASE (1)
+         grad(1) = -1
+         grad(2) = -1
+         grad(3) = -1
+      CASE (2)
+         grad(1) =  1
+         grad(2) = -1
+         grad(3) = -1
+      CASE (3)
+         grad(1) =  1
+         grad(2) =  1
+         grad(3) = -1
+      CASE (4)
+         grad(1) = -1
+         grad(2) =  1
+         grad(3) = -1
+      CASE (5)
+         grad(3) =  2
+      CASE DEFAULT
+         CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
+      END SELECT
+      grad = grad/2
+      grad(3) = grad(3)/SQRT(2._dp)
+    END FUNCTION H1Basis_dPyramidTL
+
+
+
+  SUBROUTINE H1Basis_PyramidEdgeP(nvec, u, v, w, pmax, nbasismax, fval, nbasis, edgedir)
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: nvec
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH), INTENT(IN) :: u, v, w
+    INTEGER, DIMENSION(:) CONTIG, INTENT(IN) :: pmax
+    INTEGER, INTENT(IN) :: nbasismax
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax), INTENT(INOUT) :: fval
+    INTEGER, INTENT(INOUT) :: nbasis
+    INTEGER, DIMENSION(:,:) CONTIG, INTENT(IN) :: edgedir
+
+    REAL(KIND=dp), DIMENSION(VECTOR_BLOCK_LENGTH,nbasismax) :: n
+    REAL(KIND=dp) :: La, Lb, Na, Nb
+    REAL(KIND=dp), PARAMETER :: c = 1D0/2D0
+    INTEGER :: i,j,k,l, node1, node2, nnb
+!DIR$ ASSUME_ALIGNED u:64, v:64, w:64, fval:64
+
+    REAL(KIND=dp) :: s, sq2=SQRT(2.0_dp)
+
+    DO i=1,4 ! square face
+      node1 = edgedir(1,i)
+      node2 = edgedir(2,i)
+
+      DO j=2,pmax(i)
+        !_ELMER_OMP_SIMD PRIVATE(La, Lb, Na, Nb, s)
+        DO k=1,nvec
+          s = w(k)/sq2
+
+          Na = fval(k,node1)
+          Nb = fval(k,node2)
+          La = H1Basis_PyramidL(node1,u(k),v(k))
+          Lb = H1Basis_PyramidL(node2,u(k),v(k))
+
+          fval(k,nbasis+j-1) = Na*Nb*H1Basis_varPhi(j,Lb-La)
+        END DO
+      END DO
+      nbasis = nbasis + MAX(pmax(i)-1,0)
+    END DO
+
+    DO i=5,8 ! triangular faces
+      Node1 = edgedir(1,i)
+      Node2 = edgedir(2,i)
+
+      DO j=2,pmax(i)
+        !_ELMER_OMP_SIMD PRIVATE(La, Lb, Na, Nb, s)
+        DO k=1,nvec
+          s = w(k)/sq2
+
+          Na = fval(k,node1)
+          Nb = fval(k,node2)
+          La = H1Basis_PyramidTL(node1,u(k),v(k),w(k))
+          Lb = H1Basis_PyramidTL(node2,u(k),v(k),w(k))
+
+          fval(k,nbasis+j-1) = Na*Nb*H1Basis_varPhi(j,Lb-La)
+        END DO
+      END DO
+      nbasis = nbasis + MAX(pmax(i)-1,0)
+    END DO
+  END SUBROUTINE H1Basis_PyramidEdgeP
+
 
   SUBROUTINE H1Basis_BrickNodal(nvec, u, v, w, nbasismax, fval, nbasis)
     IMPLICIT NONE

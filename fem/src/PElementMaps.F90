@@ -888,7 +888,7 @@ CONTAINS
        BubbleDOFs = (p-2)*(p-1)*p/6
     ! Prism
     CASE (7)
-       BubbleDOFs = (p-1)*(p)*(p+1)/6
+       BubbleDOFs = (p-1)**2*(p-2)/2
     ! Hexa
     CASE (8)
        BubbleDOFs = (p-1)**3 ! (p-1)*(p)*(p+1)/6
