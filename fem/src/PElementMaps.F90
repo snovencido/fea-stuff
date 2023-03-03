@@ -1213,8 +1213,12 @@ CONTAINS
 
         ! Economic quadratures cannot be used if an explicit bubble augmentation is used
         ! with lower-order finite elements:
-        IF ( .NOT.(Element % PDefs % P < 4 .AND. Element % BDOFs>0) ) THEN
-          IF (maxp > 1 .AND. maxp <= 7) THEN
+#if 0
+! These don't seem to integrate mass matrices of the complete polynomials
+! accurately -> disable (at least for now) 
+
+        IF ( .NOT.(Element % PDefs % P<4 .AND. Element % BDOFs>0) ) THEN
+          IF (maxp > 1 .AND. maxp <= 4) THEN
             !PRINT *, 'SETTING SPECIAL NGP'
             !PRINT *, 'MAXP=',MAXP
             SELECT CASE(maxp)
@@ -1234,6 +1238,7 @@ CONTAINS
             RETURN
           END IF
         END IF
+#endif
       END IF
       ! Get the number r of Gauss points for the product of two basis functions: 
       ! r = (2*max(p)+1)/2
@@ -1335,6 +1340,9 @@ CONTAINS
       END IF
 
       ! An economic quadrature may be available: 
+#if 0
+! These don't seem to integrate mass matrices of the complete polynomials
+! accurately -> disable (at least for now) 
       IF (Face % TYPE % ElementCode / 100 == 4) THEN
         !IF ( .NOT.(maxp < 4 .AND. Face % BDOFs>0) ) THEN
         IF (maxp > 1 .AND. maxp <= 8) THEN
@@ -1357,6 +1365,7 @@ CONTAINS
           RETURN
         END IF
       END IF
+#endif
 
       ! Get the standard number of Gauss points:
       i = maxp + 1

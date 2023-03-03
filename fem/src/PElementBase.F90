@@ -545,11 +545,8 @@ MODULE PElementBase
       Lb = QuadL(nodes(2),u,v)
 
       ! For inverted edges swap direction
-      IF (invert) THEN
-        phiPar = La-Lb
-      ELSE
-        phiPar = Lb-La
-      END IF
+      phiPar = Lb-La
+      IF (invert) phiPar = -PhiPar
 
       ! Get value of edge function
       value = Na*Nb*varPhi(i,phiPar)
@@ -772,13 +769,17 @@ MODULE PElementBase
       INTEGER, INTENT(IN) :: i,j
       REAL (KIND=dp), INTENT(IN) :: u,v
       INTEGER, OPTIONAL :: localNumbers(4)
+      INTEGER :: local(4) 
       REAL (KIND=dp) :: La, Lb, Lc, value, Pa, Pb
 
       ! Calculate value of function without direction and return
       ! if local numbering not present
       IF (.NOT. PRESENT(localNumbers)) THEN
-         value = Phi(i+2,u)*Phi(j+2,v)
-         RETURN
+!       Pa = QuadNodalPBasis(LocalNumbers(1),u,v)
+!       Pb = QuadNodalPBasis(LocalNumbers(3),u,v)
+!       value = Pa*Pb*LegendreP(i,u)*LegendreP(j,v)
+value  = phi(i+2,u) * phi(j+2,v)
+        RETURN
       END IF
       
       ! Numbering present, so use it
