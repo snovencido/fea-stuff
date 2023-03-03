@@ -269,13 +269,8 @@ CONTAINS
      IF( ABS(f1-f2) < 1.d-7 ) RETURN
      scal = MAX(ABS(f1),ABS(f2))
      IF(ABS(f1-f2)>scal*eps) THEN
-<<<<<<< HEAD
        PRINT*,f1,f2,ABS(f1-f2), '>', scal*eps, str
        STOP str 
-=======
-       PRINT*,str,":",f1,f2,ABS(f1-f2), '>', scal*eps
-       STOP  
->>>>>>> origin/devel
      END IF
 !------------------------------------------------------------------------------
    END SUBROUTINE CheckValue

@@ -603,7 +603,7 @@ MODULE PElementBase
 
       ! Parameter validity check
       IF (edge < 1 .OR. edge > 4) THEN
-         CALL Fatal('PElementBase::dBrickPyraEdgePBasis','Unknown edge for brick')
+         CALL Fatal('PElementBase::dQuadPyraEdgePBasis','Unknown edge for quad.')
       END IF
 
       ! Get nodes of edge
@@ -686,7 +686,7 @@ MODULE PElementBase
 
       ! Parameter validity check
       IF (edge < 1 .OR. edge > 4) THEN
-         CALL Fatal('PElementBase::dBrickPyraEdgePBasis','Unknown edge for brick')
+         CALL Fatal('PElementBase::dQuadEdgePBasis','Unknown edge for quad.')
       END IF
 
       ! Get nodes of edge
@@ -985,7 +985,7 @@ MODULE PElementBase
 !>     calculation of changing parameters for bubbles of quadrilateral if 
 !>     directional function values are requested. 
 !------------------------------------------------------------------------------
-    FUNCTION QuadL(which, u, v) RESULT(value)
+    PURE FUNCTION QuadL(which, u, v) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -1007,6 +1007,7 @@ MODULE PElementBase
       REAL(Kind=dp), INTENT(IN) :: u, v
       REAL(Kind=dp) :: value
 
+      value = 0.0_dp
       SELECT CASE (which)
       CASE (1)
          value = (2-u-v)/2
@@ -1016,9 +1017,10 @@ MODULE PElementBase
          value = (2+u+v)/2
       CASE (4)
          value = (2-u+v)/2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
-         value = 0.0_dp
          CALL Fatal('PElementBase::QuadL', 'Unknown helper function L for quad')
+#endif
       END SELECT
     END FUNCTION QuadL
 
@@ -1027,7 +1029,7 @@ MODULE PElementBase
 !>     Defines gradients of linear functions for quadrilateral nodes. For use 
 !>     see QuadL. 
 !------------------------------------------------------------------------------
-    FUNCTION dQuadL(which, u, v) RESULT(grad)
+    PURE FUNCTION dQuadL(which, u, v) RESULT(grad)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -1058,8 +1060,10 @@ MODULE PElementBase
          grad(1:2) = [  1d0/2,  1d0/2 ]
       CASE (4)
          grad(1:2) = [ -1d0/2,  1d0/2 ]
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::dQuadL', 'Unknown helper function dL for quad')
+#endif
       END SELECT
     END FUNCTION dQuadL
 
@@ -1722,8 +1726,6 @@ MODULE PElementBase
 !          La*Lb*Lc*Lb_Laj*n*toExp(2*Lc-1,n-1)*(2d0*dLc)
 !     value = La*Lb*Lc*((Lb-La)**j)*((2*Lc-1)**n)
 
-!do i=1,1000
-!at0 = cputime() 
       grad(1,1) = &
          dLa(1)*(dLb(1)*(Lc*Lb_Laj*Lc_1n)+dLc(1)*(Lb*Lb_Laj*Lc_1n)+dLb_Laj(1)*(Lb*Lc*Lc_1n)+dLc_1n(1)*(Lb*Lc*Lb_Laj)) + &
          dLb(1)*(dLa(1)*(Lc*Lb_Laj*Lc_1n)+dLc(1)*(La*Lb_Laj*Lc_1n)+dLb_Laj(1)*(La*Lc*Lc_1n)+dLc_1n(1)*(La*Lc*Lb_Laj)) + &
@@ -2682,7 +2684,7 @@ MODULE PElementBase
     END FUNCTION ddBrickBubblePBasis
 
 
-    FUNCTION BrickL(which, u, v, w) RESULT(value)
+    PURE FUNCTION BrickL(which, u, v, w) RESULT(value)
       IMPLICIT NONE
       
       ! Parameters
@@ -2709,12 +2711,14 @@ MODULE PElementBase
          value = (3+u+v+w)/2d0
       CASE (8)   
          value = (3-u+v+w)/2d0
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::BrickL','Unknown function L for brick')
+#endif
       END SELECT
     END FUNCTION BrickL
 
-    FUNCTION dBrickL(which, u, v, w) RESULT(grad)
+    PURE FUNCTION dBrickL(which, u, v, w) RESULT(grad)
       IMPLICIT NONE
       
       ! Parameters
@@ -2757,8 +2761,10 @@ MODULE PElementBase
          grad(1) = -1d0/2 
          grad(2) =  1d0/2
          grad(3) =  1d0/2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::dBrickL','Unknown function dL for brick')
+#endif
       END SELECT
     END FUNCTION dBrickL
 
@@ -5004,7 +5010,7 @@ MODULE PElementBase
     END FUNCTION ddWedgeBubblePBasis
 
 
-    FUNCTION WedgeL(which, u, v) RESULT(value)
+    PURE FUNCTION WedgeL(which, u, v) RESULT(value)
       IMPLICIT NONE
 
       ! Parameters
@@ -5021,12 +5027,14 @@ MODULE PElementBase
          value = 1d0/2*(1d0+u-v/SQRT(3d0))
       CASE (3,6)
          value = SQRT(3d0)/3*v
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::WedgeL','Unknown linear function L for wedge')
+#endif
       END SELECT
     END FUNCTION WedgeL
 
-    FUNCTION WedgeH(which, w) RESULT(value)
+    PURE FUNCTION WedgeH(which, w) RESULT(value)
       IMPLICIT NONE
 
       ! Parameters
@@ -5041,12 +5049,14 @@ MODULE PElementBase
          value = -w/2
       CASE (4,5,6)
          value = w/2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::WedgeH','Unknown linear function H for wedge')
+#endif
       END SELECT
     END FUNCTION WedgeH
 
-    FUNCTION dWedgeL(which, u, v) RESULT(grad)
+    PURE FUNCTION dWedgeL(which, u, v) RESULT(grad)
       IMPLICIT NONE
       
       ! Parameters
@@ -5065,12 +5075,14 @@ MODULE PElementBase
          grad(2) = -SQRT(3d0)/6
       CASE (3,6)
          grad(2) = SQRT(3d0)/3
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::dWedgeL','Unknown linear function dL for wedge')
+#endif
       END SELECT
     END FUNCTION dWedgeL
 
-    FUNCTION dWedgeH(which, w) RESULT(grad)
+    PURE FUNCTION dWedgeH(which, w) RESULT(grad)
       IMPLICIT NONE
 
       ! Parameters
@@ -5085,8 +5097,10 @@ MODULE PElementBase
          grad(3) = -1d0/2
       CASE (4,5,6)
          grad(3) = 1d0/2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::dWedgeH','Unknown linear function dH for wedge')
+#endif
       END SELECT
     END FUNCTION dWedgeH
 
@@ -6121,7 +6135,7 @@ MODULE PElementBase
     END FUNCTION ddPyramidBubblePBasis
 
     ! Define affine coordinates for pyramid square face
-    FUNCTION PyramidL(which, u, v) RESULT(value)
+    PURE FUNCTION PyramidL(which, u, v) RESULT(value)
       IMPLICIT NONE
 
       ! Parameters
@@ -6139,12 +6153,14 @@ MODULE PElementBase
          value = ((1+u)+(1+v))/2
       CASE (4)
          value = ((1-u)+(1+v))/2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::PyramidL','Unknown affine coordinate for square face')
+#endif
       END SELECT
     END FUNCTION PyramidL
 
-    FUNCTION dPyramidL(which, u, v) RESULT(grad)
+    PURE FUNCTION dPyramidL(which, u, v) RESULT(grad)
       IMPLICIT NONE
       
       ! Parameters
@@ -6162,13 +6178,15 @@ MODULE PElementBase
          grad = [ 1d0/2, 1d0/2,0d0 ]
       CASE (4)
          grad = [-1d0/2, 1d0/2,0d0 ]
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::dPyramidL','Unknown affine coordinate for square face')
+#endif
       END SELECT
     END FUNCTION dPyramidL
 
 
-    FUNCTION PyramidTL(which, u, v, w) RESULT(value)
+    PURE FUNCTION PyramidTL(which, u, v, w) RESULT(value)
       IMPLICIT NONE
       
       ! Parameters
@@ -6190,12 +6208,14 @@ MODULE PElementBase
          value = (2-u+v-s)/2
       CASE (5)
          value = s
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
+#endif
       END SELECT
     END FUNCTION PyramidTL
 
-    FUNCTION dPyramidTL(which, u, v, w) RESULT(grad)
+    PURE FUNCTION dPyramidTL(which, u, v, w) RESULT(grad)
       IMPLICIT NONE
       
       ! Parameters
@@ -6225,8 +6245,10 @@ MODULE PElementBase
          grad(3) = -1
       CASE (5)
          grad(3) =  2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          CALL Fatal('PElementBase::PyramidTL','Unknown function L for brick')
+#endif
       END SELECT
       grad = grad/2
       grad(3) = grad(3)/SQRT(2._dp)
@@ -6237,7 +6259,7 @@ MODULE PElementBase
 !>    Phi function value at point x. Phi is defined as (Szabo & Babuska: Finite
 !>    Element Analysis, p.38). 
 !------------------------------------------------------------------------------
-    FUNCTION Phi(i,x) RESULT(value)
+    PURE FUNCTION Phi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  DESCRIPTION:
@@ -6267,9 +6289,11 @@ MODULE PElementBase
       ! Return value
       REAL (KIND=dp) :: value
 
+#ifdef DEBUG_PBASIS
       IF (i < 2) THEN
          CALL Fatal('PElementBase::Phi','Phi(i,x) not defined for i<2')
       END IF
+#endif
 
       ! Check if value is available by direct calculation
       IF (i <= 20) THEN
@@ -6286,7 +6310,7 @@ MODULE PElementBase
 !>    Phi,(i,x)=SQRT(1/(2*(2*i-1)))(P,(i,x)-P,(i-2,x)), i=2,3,... 
 !>    where P,(i,x) are derivatives of legendre polynomials.
 !------------------------------------------------------------------------------
-    FUNCTION dPhi(i,x) RESULT(value)
+    PURE FUNCTION dPhi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -6310,9 +6334,11 @@ MODULE PElementBase
       ! Return value
       REAL (KIND=dp) :: value
 
+#ifdef DEBUG_PBASIS
       IF (i < 2) THEN
          CALL Fatal('PElementBase::dPhi','dPhi(i,x) not defined for i<2')
       END IF
+#endif
 
       ! 20 first derivatives of phi functions are precalculated
       ! They are all generated with Maple 
@@ -6382,8 +6408,10 @@ MODULE PElementBase
               26466926850D0 * x ** 10 - 10039179150D0 * x ** 8 + 2230928700D0 * x ** 6 - &
               267711444D0 * x ** 4 + 14549535D0 * x ** 2 - 230945) / 0.131072D6
          ! If no precalculated value available generate value of function
+#ifdef DEBUG_PBASIS
       CASE DEFAULT 
          value = SQRT(1d0/(2*(2*i-1)))*(dLegendreP(i,x)-dLegendreP(i-2,x))
+#endif
       END SELECT
     END FUNCTION dPhi
 
@@ -6392,7 +6420,7 @@ MODULE PElementBase
 !>    Phi,(i,x)=SQRT(1/(2*(2*i-1)))(P,(i,x)-P,(i-2,x)), i=2,3,... 
 !>    where P,(i,x) are derivatives of legendre polynomials.
 !------------------------------------------------------------------------------
-    FUNCTION ddPhi(i,x) RESULT(value)
+    PURE FUNCTION ddPhi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -6416,9 +6444,11 @@ MODULE PElementBase
       ! Return value
       REAL (KIND=dp) :: value
 
+#ifdef DEBUG_PBASIS
       IF (i < 2) THEN
          CALL Fatal('PElementBase::dPhi','dPhi(i,x) not defined for i<2')
       END IF
+#endif
 
       ! 20 first derivatives of phi functions are precalculated
       ! They are all generated with Maple 
@@ -6484,9 +6514,11 @@ MODULE PElementBase
               5*267711444D0 * x ** 4 + 3*14549535D0 * x ** 2 - 230945) / 0.131072D6
          ! If no precalculated value available generate value of function
       CASE DEFAULT 
+#ifdef DEBUG_PBASIS
          PRINT*,'Legendre phi: ', i
          STOP 'no ddph > 20'
 !        value = SQRT(1d0/(2*(2*i-1)))*(dLegendreP(i,x)-dLegendreP(i-2,x))
+#endif
       END SELECT
     END FUNCTION ddPhi
 
@@ -6498,7 +6530,7 @@ MODULE PElementBase
 !>    Element Analysis, p. 103).     
 !>    Phi(i,x)=1/4*(1-x^2)*varPhi(i,x)
 !------------------------------------------------------------------------------
-    FUNCTION varPhi(i,x) RESULT(value)
+    PURE FUNCTION varPhi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -6524,8 +6556,10 @@ MODULE PElementBase
       ! 20 first varphi functions are precalculated
       ! These are all generated with Maple
       SELECT CASE(i)
+#ifdef DEBUG_PBASIS
       CASE (:1)
          CALL Fatal('PElementBase::varPhi','varPhi not defined for i<2')
+#endif
       CASE (2)
          value = -SQRT(0.6D1)
       CASE (3)
@@ -6587,6 +6621,7 @@ MODULE PElementBase
               * x ** 14 - 5757717420D0 * x ** 12 + 3064591530D0 * x ** 10 - 951080130D0 & 
               * x ** 8 + 164384220D0 * x ** 6 - 14090076D0 * x ** 4 + 459459 * &
               x ** 2 - 2431) * SQRT(0.78D2) / 0.131072D6
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          IF (x==1 .OR. x==-1) THEN
             ! TEMP SOLUTION!
@@ -6595,6 +6630,7 @@ MODULE PElementBase
          ELSE 
             value = 4*Phi(i,x)/(1-x**2)
          END IF
+#endif
       END SELECT
       
     END FUNCTION varPhi
@@ -6603,7 +6639,7 @@ MODULE PElementBase
 !------------------------------------------------------------------------------
 !>    Derivative of varPhi function at point x.
 !------------------------------------------------------------------------------
-    FUNCTION dVarPhi(i,x) RESULT(value)
+    PURE FUNCTION dVarPhi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -6628,8 +6664,10 @@ MODULE PElementBase
 
       ! 
       SELECT CASE(i)
+#ifdef DEBUG_PBASIS
       CASE (:1)
          CALL Fatal('PElementBase::dVarPhi','dVarPhi not defined for i<2')
+#endif
       CASE (2)
          value = 0      
       CASE (3)
@@ -6702,6 +6740,7 @@ MODULE PElementBase
               463991880D0 * x ** 14 + 695987820D0 * x ** 12 - 548354040D0 * x ** 10 + &
               243221550D0 * x ** 8 - 60386040D0 * x ** 6 + 7827820D0 * x ** 4 - 447304D0 * &
               x ** 2 + 7293) * SQRT(0.78D2)
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          IF (x==1 .OR. x==-1) THEN
             ! TEMP SOLUTION
@@ -6713,13 +6752,14 @@ MODULE PElementBase
          ELSE
             value = 4*((1-x**2)*dPhi(i,x)+2*x*Phi(i,x))/(1-x**2)**2
          END IF
+#endif
       END SELECT
     END FUNCTION dVarPhi
 
 !------------------------------------------------------------------------------
 !>    2nd derivatives of varPhi function at point x.
 !------------------------------------------------------------------------------
-    FUNCTION ddVarPhi(i,x) RESULT(value)
+    PURE FUNCTION ddVarPhi(i,x) RESULT(value)
 !------------------------------------------------------------------------------
 !
 !  ARGUMENTS:
@@ -6744,8 +6784,10 @@ MODULE PElementBase
 
       ! 
       SELECT CASE(i)
+#ifdef DEBUG_PBASIS
       CASE (:1)
          CALL Fatal('PElementBase::dVarPhi','dVarPhi not defined for i<2')
+#endif
       CASE (2)
          value = 0      
       CASE (3)
@@ -6814,6 +6856,7 @@ MODULE PElementBase
               463991880D0 * 15*x ** 14 + 695987820D0 * 13*x ** 12 - 548354040D0 * 11*x ** 10 + &
               243221550D0 * 9*x ** 8 - 60386040D0 * 7*x ** 6 + 7827820D0 * 5*x ** 4 - 447304D0 * &
               3*x ** 2 + 7293) * SQRT(0.78D2)
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          stop ' ddvarphi > 20 ?'
          IF (x==1 .OR. x==-1) THEN
@@ -6827,6 +6870,7 @@ MODULE PElementBase
             value = 4*((1-x**2)*dPhi(i,x)+2*x*Phi(i,x))/(1-x**2)**2
             value = 4*((1-x**2)*dPhi(i,x)+2*x*Phi(i,x))/(1-x**2)**2
          END IF
+#endif
       END SELECT
     END FUNCTION ddVarPhi
 
@@ -6841,7 +6885,7 @@ MODULE PElementBase
 !>    P(i+1,x)=1/(1+i)*((2*i+1)*x*P(i,x)+i*P(i-1,x)), 
 !>    where P(0,x)=1, P(1,x)=x.
 !------------------------------------------------------------------------------
-    RECURSIVE FUNCTION LegendreP(l,x) RESULT(value) 
+    PURE RECURSIVE FUNCTION LegendreP(l,x) RESULT(value) 
 !------------------------------------------------------------------------------
 ! 
 !  ARGUMENTS:
@@ -6872,8 +6916,10 @@ MODULE PElementBase
       ! First 20 Legendre polynomials are precalculated. These are 
       ! all generated with Maple
       SELECT CASE (l)
+#ifdef DEBUG_PBASIS
       CASE (:-1)
          CALL Fatal('PElementBase::LegendreP','LegendreP not defined for l < 0')
+#endif
       CASE (0)
          value = 1      
       CASE (1)
@@ -6957,6 +7003,7 @@ MODULE PElementBase
               0.131072D6 * x ** 12 - 0.29113619535D11 / 0.65536D5 * x ** 10 + &
               0.15058768725D11 / 0.131072D6 * x ** 8 - 0.557732175D9 / 0.32768D5 * &
               x ** 6 + 0.334639305D9 / 0.262144D6 * x ** 4 - 0.4849845D7 / 0.131072D6 * x ** 2
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          ! Generate n:th Legendre polynomial
          
@@ -6975,6 +7022,7 @@ MODULE PElementBase
          END DO
      
          value = P_l
+#endif
       END SELECT
       ! Value contains LegendreP(l,x)
     END FUNCTION LegendreP
@@ -6990,7 +7038,7 @@ MODULE PElementBase
 !>    P,(l+1,x)=x*P,(l,x)+(l+1)*P(l,x), 
 !>    where P,(0,x)=0, P(1,x)=1.
 !------------------------------------------------------------------------------
-    RECURSIVE FUNCTION dLegendreP(l,x) RESULT(value)
+    PURE RECURSIVE FUNCTION dLegendreP(l,x) RESULT(value)
 !------------------------------------------------------------------------------
 ! 
 !  ARGUMENTS:
@@ -7019,8 +7067,10 @@ MODULE PElementBase
       INTEGER :: k 
 
       SELECT CASE(l)
+#ifdef DEBUG_PBASIS
       CASE (:-1)
          CALL Fatal('PElementBase::dLegendreP','dLegendreP not defined for l < 0')
+#endif
       CASE (0)
          value = 0
       CASE (1)
@@ -7103,6 +7153,7 @@ MODULE PElementBase
               x ** 11 - 0.145568097675D12 / 0.32768D5 * x ** 9 + 0.15058768725D11 / &
               0.16384D5 * x ** 7 - 0.1673196525D10 / 0.16384D5 * x ** 5 + 0.334639305D9 /&
               0.65536D5 * x ** 3 - 0.4849845D7 / 0.65536D5 * x
+#ifdef DEBUG_PBASIS
       CASE DEFAULT
          ! Generate derivative of n:th Legendre polynomial
 
@@ -7120,6 +7171,7 @@ MODULE PElementBase
          END DO
      
          value = dP_l
+#endif
       END SELECT
       ! Value now contains P,(l,x)
     END FUNCTION dLegendreP
@@ -7134,7 +7186,7 @@ MODULE PElementBase
 !>    P,(l+1,x)=x*P,(l,x)+(l+1)*P(l,x), 
 !>    where P,(0,x)=0, P(1,x)=1.
 !------------------------------------------------------------------------------
-    RECURSIVE FUNCTION ddLegendreP(l,x) RESULT(value)
+    PURE RECURSIVE FUNCTION ddLegendreP(l,x) RESULT(value)
 !------------------------------------------------------------------------------
 ! 
 !  ARGUMENTS:
@@ -7163,8 +7215,10 @@ MODULE PElementBase
       INTEGER :: k 
 
       SELECT CASE(l)
+#ifdef DEBUG_PBASIS
       CASE (:-1)
          CALL Fatal('PElementBase::dLegendreP','dLegendreP not defined for l < 0')
+#endif
       CASE (0)
          value = 0
       CASE (1)
@@ -7246,6 +7300,7 @@ MODULE PElementBase
               0.16384D5 * 7*x ** 6 - 0.1673196525D10 / 0.16384D5 * 5*x ** 4 + 0.334639305D9 /&
               0.65536D5 * 3*x ** 2 - 0.4849845D7 / 0.65536D5
       CASE DEFAULT
+#ifdef DEBUG_PBASIS
          ! Generate derivative of n:th Legendre polynomial
 
          STOP 'No 2nd derivative for Legendre > 20'
@@ -7264,6 +7319,7 @@ MODULE PElementBase
          END DO
      
          value = dP_l
+#endif
       END SELECT
       ! Value now contains P,(l,x)
     END FUNCTION ddLegendreP

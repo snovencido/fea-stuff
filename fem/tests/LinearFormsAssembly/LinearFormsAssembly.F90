@@ -74,6 +74,12 @@ SUBROUTINE LinearFormsAssembly( Model,Solver,dt,TransientSimulation )
     END IF
     nerror = nerror + netest
 
+    netest = TestPyramidElement(Solver, P, tol3d*10)
+    IF (netest /= 0) THEN
+      CALL Warn('LinearFormsAssembly','Pyramid element contained errors')
+    END IF
+    nerror = nerror + netest
+
     netest = TestWedgeElement(Solver, P, tol3d)
     IF (netest /= 0) THEN
       CALL Warn('LinearFormsAssembly','Wedge element contained errors')
@@ -146,6 +152,17 @@ CONTAINS
     
     nerror = TestElement(Solver, 706, P, tol)
   END FUNCTION TestWedgeElement
+
+  FUNCTION TestPyramidElement(Solver, P, tol) RESULT(nerror)
+    IMPLICIT NONE
+    
+    TYPE(Solver_t) :: Solver
+    INTEGER, INTENT(IN) :: P
+    REAL(kind=dp), INTENT(IN) :: tol
+    INTEGER :: nerror
+    
+    nerror = TestElement(Solver, 605, P, tol)
+  END FUNCTION TestPyramidElement
 
   FUNCTION TestBrickElement(Solver, P, tol) RESULT(nerror)
     IMPLICIT NONE

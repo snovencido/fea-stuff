@@ -4545,135 +4545,78 @@ CONTAINS
            CALL H1Basis_dTetraBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, dBasisdxWrk, nbdxp)
          END IF
 
-         ! TEMPORARY NONVECTORIZED PYRAMID
+       ! Pyramid
        CASE (605)
-BLOCK
-         INTEGER ::  F, locali, localj, nb, q, tmp(4), direction(4)
-         LOGICAL :: invert
-         TYPE(Element_t), POINTER :: Face, Edge
+         ! Compute nodal basis
+         CALL H1Basis_PyramidNodalP(ncl, uWrk, vWrk, wWrk, nbmax, BasisWrk, nbp)
+         ! Compute local first derivatives
+         CALL H1Basis_dPYramidNodalP(ncl, uWrk, vWrk, wWrk, nbmax, dBasisdxWrk, nbdxp)
 
-         dBasisdxWrk(1:ncl,:,:) = 0.0d0
-         BasisWrk(1:ncl,:) = 0.0d0
-         DO l=1,ncl
-           CALL NodalBasisFunctions(5, BasisWrk(l,:), element, uWrk(l), vWrk(l), wWrk(l))
-           CALL NodalFirstDerivatives(5, dBasisdxWrk(l,:,:), element, uWrk(l), vWrk(l), wWrk(l) )
+         IF (ASSOCIATED( Element % EdgeIndexes )) THEN
+           ! For first round of blocked loop, compute polynomial degrees and 
+           ! edge directions
+           IF (ll==1) THEN
+             CALL GetElementMeshEdgeInfo(CurrentModel % Solver % Mesh, &
+                   Element, EdgeDegree, EdgeDirection, EdgeMaxDegree)
+           END IF
 
-           q = 5
+           ! Compute basis function values
+           IF (EdgeMaxDegree > 1)THEN
+             nbq = nbp+SUM(EdgeDegree(1:8)-1)
+             IF(nbmax >= nbq) THEN
+               CALL H1Basis_PyramidEdgeP(ncl, uWrk, vWrk, wWrk, EdgeDegree, nbmax, BasisWrk, nbp, &
+                     EdgeDirection)
 
-           ! Edges of P Pyramid
-           IF (ASSOCIATED( Element % EdgeIndexes ) ) THEN
-             ! For each edge in wedge, calculate values of edge functions
-             DO i=1,8
-                Edge => CurrentModel % Solver % Mesh % Edges( Element % EdgeIndexes(i) )
- 
-                ! Do not solve edge dofs, if there is not any
-                IF (Edge % BDOFs <= 0) CYCLE
-              
-                ! Get local indexes of current edge
-                tmp(1:2) = getPyramidEdgeMap(i)
-                locali = tmp(1)
-                localj = tmp(2)
+               CALL H1Basis_dPyramidEdgeP(ncl, uWrk, vWrk, wWrk, EdgeDegree, nbmax, dBasisdxWrk, nbdxp, &
+                     EdgeDirection)
+             END IF
+           END IF
+         END IF
 
-                ! Determine edge direction
-                invert = .FALSE.
-              
-                ! Invert edge if local first node has greater global index than second one
-                IF ( Element % NodeIndexes(locali) > Element % NodeIndexes(localj) ) invert = .TRUE.
+         IF (ASSOCIATED( Element % FaceIndexes )) THEN
+           ! For first round of blocked loop, compute polynomial degrees and 
+           ! face directions
+           IF (ll==1) THEN
+             CALL GetElementMeshFaceInfo(CurrentModel % Solver % Mesh, &
+                   Element, FaceDegree, FaceDirection, FaceMaxDegree)
+           END IF
 
-                ! For each DOF in edge calculate values of edge functions
-                ! and their derivatives for edge=i and i=k+1
-                DO k=1,Edge % BDOFs
-                   IF ( q >= SIZE(BasisWrk,2) ) CYCLE
-                   q = q + 1
-
-                   ! Get values of edge basis functions and their derivatives
-                   BasisWrk(l,q) = PyramidEdgePBasis(i,k+1,uwrk(l),vwrk(l),wwrk(l),invert)
-                   dBasisdxWrk(l,q,1:3) = dPyramidEdgePBasis(i,k+1,uwrk(l),vwrk(l),wwrk(l),invert)
-                END DO
+           ! Compute basis function values
+           IF (FaceMaxDegree > 1 ) THEN
+             nbq = nbp
+             ! Square faces
+             DO i=1,1
+               DO j=0,FaceDegree(i)-2
+                 nbq = nbq + MAX(FaceDegree(i)-1,0)
+               END DO
              END DO
-           END IF
-        
-           ! Faces of P Pyramid
-           IF ( ASSOCIATED( Element % FaceIndexes ) ) THEN
-              ! For each face in pyramid, calculate values of face functions
-              DO F=1,5
-                 Face => CurrentModel % Solver % Mesh % Faces( Element % FaceIndexes(F) )
 
-                 ! Do not solve face dofs, if there is not any
-                 IF ( Face % BDOFs <= 0) CYCLE
-              
-                 ! Get face p
-                 p = Face % PDefs % P 
-              
-                 ! Handle triangle and square faces separately
-                 SELECT CASE(F)
-                 CASE (1)
-                    direction = 0
-                    ! Get global direction vector for enforcing parity
-                    tmp(1:4) = getPyramidFaceMap(F)
-                    direction(1:4) = getSquareFaceDirection( Element, tmp(1:4), &
-                           Element % NodeIndexes )
-                 
-                    ! For each face calculate values of functions from index
-                    ! pairs i,j=2,..,p-2 i+j=4,..,p
-                    DO i=0,p-2
-                       DO j=0,p-2
-                          IF ( q >= SIZE(BasisWrk,2) ) CYCLE
-                          q = q + 1
-                       
-                          BasisWrk(l,q) = PyramidFacePBasis(F,i,j,uwrk(l),vwrk(l),wwrk(l),direction)
-                          dBasisdxWrk(l,q,:) = dPyramidFacePBasis(F,i,j,uwrk(l),vwrk(l),wwrk(l),direction)
-                       END DO
-                    END DO
-
-                 CASE (2,3,4,5)
-                    direction = 0
-                    ! Get global direction vector for enforcing parity
-                    tmp(1:4) = getPyramidFaceMap(F) 
-                    direction(1:3) = getTriangleFaceDirection( Element, tmp(1:3), &
-                            Element % NodeIndexes )
-                 
-                    ! For each face calculate values of functions from index
-                    ! pairs i,j=0,..,p-3 i+j=0,..,p-3
-                    DO i=0,p-3
-                       DO j=0,p-i-3
-                          IF ( q >= SIZE(BasisWrk,2) ) CYCLE
-                          q = q + 1
-
-                          BasisWrk(l,q) = PyramidFacePBasis(F,i,j,uwrk(l),vwrk(l),wwrk(l),direction)
-                          dBasisdxWrk(l,q,:) = dPyramidFacePBasis(F,i,j,uwrk(l),vwrk(l),wwrk(l),direction)
-                       END DO
-                    END DO
-                 END SELECT    
-              END DO
-           END IF
-
-           ! Bubbles of P Pyramid
-           p = pSolver % Def_Dofs(6,BodyId,6)
-           nb = pSolver % Def_Dofs(6,BodyId,5)
-           BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
-           IF (BDOFs > 0) THEN
-             p = getEffectiveBubbleP(element,p,bdofs)
-
-             ! Calculate value of bubble functions from indexes
-             ! i,j,k=0,..,p-4 i+j+k=0,..,p-4
-             DO i=0,p-2
-                DO j=0,p-i-2
-                   DO k=0,p-i-j-2
-                      IF ( q >= SIZE(BasisWrk,2)) CYCLE
-                      q = q + 1
-
-                      BasisWrk(l,q) = PyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
-                      dBasisdxWrk(l,q,:) = dPyramidBubblePBasis(i,j,k,uwrk(l),vwrk(l),wwrk(l))
-                   END DO
-                END DO
+             ! Triangle faces
+             DO i=2,5
+               DO j=0,FaceDegree(i)-3
+                 nbq = nbq + MAX(FaceDegree(i)-j-2,0)
+               END DO
              END DO
+             
+             IF(nbmax >= nbq) THEN
+               CALL H1Basis_PyramidFaceP(ncl, uWrk, vWrk, wWrk, FaceDegree, nbmax, BasisWrk, nbp, &
+                     FaceDirection)
+               CALL H1Basis_dPyramidFaceP(ncl, uWrk, vWrk, wWrk, FaceDegree, nbmax, dBasisdxWrk, nbdxp, &
+                     FaceDirection)
+             END IF
            END IF
-         END DO
-         
-         nbp = q
-!------------------------------------------------------------------------------
-END BLOCK
+         END IF
+
+         ! Element bubble functions
+         p = pSolver % Def_Dofs(6,BodyId,6)
+         nb = pSolver % Def_Dofs(6,BodyId,5)
+         BDOFs = MAX(GetBubbleDOFs(Element, p), nb)
+         IF (BDOFs > 0) THEN
+           p = getEffectiveBubbleP(element,p,bdofs)
+
+           CALL H1Basis_PyramidBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, BasisWrk, nbp)
+           CALL H1Basis_dPyramidBubbleP(ncl, uWrk, vWrk, wWrk, P, nbmax, dBasisdxWrk, nbdxp)
+         END IF
 
 
          ! WEDGE

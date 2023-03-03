@@ -250,6 +250,17 @@ CONTAINS
     CASE(504)
       ! Tetra edge mapping (for completeness, not needed for enforcing parity)
       CALL H1Basis_GetTetraEdgeDirection(1, map)
+
+    CASE(605)
+      flatmap(1:16) = [ 1,2,&
+                        2,3,&
+                        4,3,&
+                        1,4,&
+                        1,5,&
+                        2,5,&
+                        3,5,&
+                        4,5 ]
+
     CASE(706)
       flatmap(1:18) = [ 1,2,&
                         2,3,&
@@ -301,6 +312,15 @@ CONTAINS
     CASE(504)
       ! Tetra face mapping (for completeness, not needed for enforcing parity)
       CALL H1Basis_GetTetraFaceDirection(1, map)
+
+    CASE(605)
+      ! Pyramid face mappings
+      flatmap(1:20) = [ 1,2,3,4, &
+                        1,2,5,0, &
+                        2,3,5,0, &
+                        3,4,5,0, &
+                        4,1,5,0 ]
+
     CASE(706)
       flatmap(1:20) = [ 1,2,3,0, &
                         4,5,6,0, &
@@ -2964,7 +2984,6 @@ CONTAINS
 
           La = H1Basis_BrickL(node1, u(k), v(k), w(k))
           Lb = H1Basis_BrickL(node2, u(k), v(k), w(k))
-
           Na = fval(k, node1)
           Nb = fval(k, node2)
           fval(k, nbasis+j-1) = c*Na*Nb*H1Basis_varPhi(j, Lb-La)
@@ -3015,13 +3034,13 @@ CONTAINS
           Phi = H1Basis_varPhi(j, Lb-La)
           dPhi = H1Basis_dvarPhi(j, Lb-La)
 
-          grad(k,nbasis+j-1,1) = c*dPhi*(dLb(1)-dLa(1))*Na*Nb +&
+          grad(k,nbasis+j-1,1) = c*dPhi*(dLb(1)-dLa(1))*Na*Nb + &
                   c*Phi*dNa(1)*Nb + c*Phi*Na*dNb(1)
 
-          grad(k,nbasis+j-1,2) = c*dPhi*(dLb(2)-dLa(2))*Na*Nb +&
+          grad(k,nbasis+j-1,2) = c*dPhi*(dLb(2)-dLa(2))*Na*Nb + &
                   c*Phi*dNa(2)*Nb + c*Phi*Na*dNb(2)
 
-          grad(k,nbasis+j-1,3) = c*dPhi*(dLb(3)-dLa(3))*Na*Nb +&
+          grad(k,nbasis+j-1,3) = c*dPhi*(dLb(3)-dLa(3))*Na*Nb + &
                   c*Phi*dNa(3)*Nb + c*Phi*Na*dNb(3)
         END DO
       END DO
