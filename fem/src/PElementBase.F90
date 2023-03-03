@@ -775,10 +775,7 @@ MODULE PElementBase
       ! Calculate value of function without direction and return
       ! if local numbering not present
       IF (.NOT. PRESENT(localNumbers)) THEN
-!       Pa = QuadNodalPBasis(LocalNumbers(1),u,v)
-!       Pb = QuadNodalPBasis(LocalNumbers(3),u,v)
-!       value = Pa*Pb*LegendreP(i,u)*LegendreP(j,v)
-value  = phi(i+2,u) * phi(j+2,v)
+        value  = Phi(i+2,u)*Phi(j+2,v)
         RETURN
       END IF
       
