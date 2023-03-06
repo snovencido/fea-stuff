@@ -30,6 +30,8 @@ Simulation
   BDF Order = 1
 !  Solver Input File = case.sif
 !  Post File = case.vtu
+
+  Serendipity P Elements = False
 End
 
 Constants

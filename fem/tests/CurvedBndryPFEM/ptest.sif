@@ -11,6 +11,7 @@ Simulation
   Output Intervals(1) = 1
   Steady State Max Iterations = 1
 ! Output File = "ptest.dat"
+  Serendipity P Elements = False
 End
 
 Body 1 :: Equation = 1

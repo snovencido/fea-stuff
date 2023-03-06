@@ -31,6 +31,8 @@ Simulation
   Output Intervals = 1
 
   Simulation Timing = Logical True
+ 
+  Serendipity P Elements = False
 End  
 
 Constants

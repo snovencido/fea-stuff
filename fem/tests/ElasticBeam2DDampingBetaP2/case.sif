@@ -31,6 +31,7 @@ Simulation
   Output Intervals = 5
   vtu: Save Bulk Only = Logical True
 !  Post File = "case.vtu"
+  Serendipity P Elements = False
 End
 
 Body 1

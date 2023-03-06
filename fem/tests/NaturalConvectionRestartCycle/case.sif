@@ -49,6 +49,7 @@ Simulation
   Restart Variable 1 = String Temperature
   Restart Variable 2 = String Velocity      ! takes components 1 & 2
   Restart Variable 3 = String globaltest 1  ! takes component of the global vector
+  Serendipity P Elements = False
 End
 
 Constants

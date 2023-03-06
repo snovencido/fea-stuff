@@ -17,6 +17,7 @@ Simulation
   Steady State Max Iterations = 1
 
 !  Mesh Levels = 2
+  Serendipity P Elements = False
 End
 
 Constants

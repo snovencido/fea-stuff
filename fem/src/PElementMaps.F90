@@ -787,21 +787,29 @@ CONTAINS
     INTEGER, INTENT(IN) :: p
     INTEGER, INTENT(IN), OPTIONAL :: faceNumber
     INTEGER :: faceDOFs
+    LOGICAL :: SerendipityPBasis
 
     ! This function is not defined for non p elements
     IF (.NOT. ASSOCIATED(Element % PDefs) ) THEN
        faceDOFs = 0
        RETURN
     END IF
+    SerendipityPBasis = Element % PDefs % Serendipity
 
     faceDOFs = 0
+    IF(p<=1) RETURN
+
     SELECT CASE(Element % TYPE % ElementCode / 100)
-    ! Quad
+    ! Triangle
     CASE (3)
        faceDOFs = (p-1)*(p-2)/2
-    ! Tetrahedron
+    ! Quad
     CASE (4)
-       faceDOFs = (p-1)**2 ! (p-1)*p/2
+       IF ( SerendipityPBasis ) THEN
+         faceDOFs = (p-2)*(p-3)/2
+       ELSE
+         faceDOFs = (p-1)**2 ! (p-1)*p/2
+       END IF
     ! Tetrahedron
     CASE (5)
        faceDOFs = (p-1)*(p-2)/2
@@ -819,11 +827,19 @@ CONTAINS
        CASE (1,2)
           faceDOFs = (p-1)*(p-2)/2
        CASE (3:5)
-          faceDOFs = (p-1)**2 ! (p-1)*p/2
+          IF(SerendipityPBasis) THEN
+            faceDOFs = (p-2)*(p-3)/2
+          ELSE
+            faceDOFs = (p-1)**2 ! (p-1)*p/2
+          END IF
        END SELECT
     ! Brick   
     CASE (8)
-       faceDOFs = (p-1)**2 ! (p-1)*p/2
+       IF(SerendipityPBasis) THEN
+         faceDOFs = (p-2)*(p-3)/2
+       ELSE
+         faceDOFs = (p-1)**2 ! (p-1)*p/2
+       END IF
     CASE DEFAULT
       WRITE(Message,'(A,I0)') 'Unsupported p element type: ',Element % TYPE % ElementCode
       CALL Warn('PElementMaps::getFaceDOFs',Message)
@@ -861,6 +877,7 @@ CONTAINS
     TYPE(Element_t) :: Element
     INTEGER, INTENT(IN) :: p
     INTEGER :: bubbleDOFs, i
+    LOGICAL :: SerendipityPBasis
     
     ! This function is not defined for non p elements
     IF (.NOT. ASSOCIATED(Element % PDefs) ) THEN
@@ -868,8 +885,12 @@ CONTAINS
        RETURN
     END IF
 
+    SerendipityPBasis = Element % PDefs % Serendipity
+
     ! Select by element type
     bubbleDOFs = 0
+    IF(p<=1) RETURN
+
     SELECT CASE (Element % TYPE % ElementCode / 100)
     ! Line 
     CASE (2)
@@ -879,7 +900,11 @@ CONTAINS
       BubbleDOFs = (p-2)*(p-1)/2
     ! Quad
     CASE (4)
-      BubbleDOFs = (p-1)**2 ! (p-1)*p/2
+      IF(SerendipityPBasis) THEN
+        BubbleDOFs = (p-2)*(p-3)/2
+      ELSE
+        BubbleDOFs = (p-1)**2 ! (p-1)*p/2
+      END IF
     ! Tetrahedron
     CASE (5)
       BubbleDOFs = (p-3)*(p-2)*(p-1)/6
@@ -888,10 +913,18 @@ CONTAINS
        BubbleDOFs = (p-2)*(p-1)*p/6
     ! Prism
     CASE (7)
-       BubbleDOFs = (p-1)**2*(p-2)/2
+      IF(SerendipityPBasis) THEN
+        bubbleDOFs = (p-2)*(p-3)*(p-4)/6
+      ELSE
+        BubbleDOFs = (p-1)**2*(p-2)/2
+      END IF
     ! Hexa
     CASE (8)
-       BubbleDOFs = (p-1)**3 ! (p-1)*(p)*(p+1)/6
+      IF(SerendipityPBasis) THEN
+        bubbleDOFs = (p-3)*(p-4)*(p-5)/6
+      ELSE
+        BubbleDOFs = (p-1)**3
+      END IF
     CASE DEFAULT
        CALL Warn('PElementMaps::getBubbleDOFs','Unsupported p element type')
        bubbleDOFs = p
@@ -1205,7 +1238,7 @@ CONTAINS
       TrueBubbleP = bubbleP
 
       ! Special quadrature may be available: 
-      IF (Element % TYPE % ElementCode / 100 == 4) THEN
+      IF (Element % PDefs % Serendipity .AND. Element % TYPE % ElementCode / 100 == 4) THEN
         ! The true polynomial degree is as follows
         !maxp = MAX(1, edgeP, faceP, TrueBubbleP)
         ! but this would replace the true bubble degree by a tampered value:
@@ -1213,12 +1246,8 @@ CONTAINS
 
         ! Economic quadratures cannot be used if an explicit bubble augmentation is used
         ! with lower-order finite elements:
-#if 0
-! These don't seem to integrate mass matrices of the complete polynomials
-! accurately -> disable (at least for now) 
-
         IF ( .NOT.(Element % PDefs % P<4 .AND. Element % BDOFs>0) ) THEN
-          IF (maxp > 1 .AND. maxp <= 4) THEN
+          IF (maxp > 1 .AND. maxp <= 7) THEN
             !PRINT *, 'SETTING SPECIAL NGP'
             !PRINT *, 'MAXP=',MAXP
             SELECT CASE(maxp)
@@ -1227,7 +1256,7 @@ CONTAINS
             CASE(3)
               ngp = 12
             CASE(4)
-              ngp = 25
+              ngp = 20
             CASE(5)
               ngp = 36
             CASE(6)
@@ -1238,7 +1267,6 @@ CONTAINS
             RETURN
           END IF
         END IF
-#endif
       END IF
       ! Get the number r of Gauss points for the product of two basis functions: 
       ! r = (2*max(p)+1)/2
@@ -1340,10 +1368,7 @@ CONTAINS
       END IF
 
       ! An economic quadrature may be available: 
-#if 0
-! These don't seem to integrate mass matrices of the complete polynomials
-! accurately -> disable (at least for now) 
-      IF (Face % TYPE % ElementCode / 100 == 4) THEN
+      IF (Face % Pdefs % Serendipity .AND. Face % TYPE % ElementCode / 100 == 4) THEN
         !IF ( .NOT.(maxp < 4 .AND. Face % BDOFs>0) ) THEN
         IF (maxp > 1 .AND. maxp <= 8) THEN
           SELECT CASE(maxp)
@@ -1365,7 +1390,6 @@ CONTAINS
           RETURN
         END IF
       END IF
-#endif
 
       ! Get the standard number of Gauss points:
       i = maxp + 1

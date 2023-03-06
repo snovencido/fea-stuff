@@ -24,6 +24,8 @@ Simulation
   Timestep Intervals = 20
   Output Intervals = 1
   Steady State Max Iterations = 1
+
+  Serendipity P Elements = False
 End
 
 Body 1

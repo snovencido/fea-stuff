@@ -24,6 +24,7 @@ Simulation
   Steady State Min Iterations = 1
   Output Intervals = 1
 ! Output File = "elasticity.result"
+  Serendipity P Elements = False
 End
 
 Body 1

@@ -16,6 +16,8 @@ Simulation
   Output Intervals = 1
   Post File = "Step.ep"
 ! Output File = "Step.dat"
+
+  Serendipity P Elements = False
 End
 
 

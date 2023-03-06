@@ -93,6 +93,7 @@ CONTAINS
      IMPLICIT NONE
      INTEGER :: istat,n
 
+     LOGICAL :: Found
      TYPE(Element_t) :: Element
 
      ! Sanity check to avoid memory leaks
@@ -107,9 +108,12 @@ CONTAINS
      Element % PDefs % P = 0 
      Element % PDefs % TetraType = 0
      Element % PDefs % isEdge = .FALSE.
-     Element % PDefs % pyramidQuad = .FALSE.
      Element % PDefs % localNumber = 0
      Element % PDefs % GaussPoints = 0
+
+     Element % PDefs % Serendipity = ListGetLogical( CurrentModel % Simulation, &
+           'Serendipity P elements', Found )
+     IF(.NOT.Found) Element % PDefs % Serendipity = .TRUE.
 !------------------------------------------------------------------------------
    END SUBROUTINE AllocatePDefinitions
 !------------------------------------------------------------------------------
@@ -3005,7 +3009,6 @@ CONTAINS
          END IF
 
          ! All elements in actual mesh are not edges
-         Element % PDefs % pyramidQuad = .FALSE.
          Element % PDefs % isEdge = .FALSE.
 
          ! If element is of type tetrahedron and is a p element, 
@@ -3182,23 +3185,6 @@ CONTAINS
      IF ( NeedEdges ) THEN
        CALL Info('NonNodalElements','Requested elements require creation of edges',Level=8)
        CALL SetMeshEdgeFaceDOFs(Mesh,EdgeDOFs,FaceDOFs,inDOFs)
-
-       DO i=1,Mesh % NumberOfBulkElements
-         Element => Mesh % Elements(i)
-         IF(ASSOCIATED(Element % PDefs).AND.ASSOCIATED(Mesh % Faces)) THEN
-           DO j=1,Element % Type % NumberOfFaces
-             Element % PDefs % pyramidQuad = Element % Pdefs % PyramidQuad .OR. &
-                   Mesh % Faces(Element % FaceIndexes(j)) % PDefs % PyramidQuad
-           END DO
-           IF(Element % PDefs % PyramidQuad) THEN
-             IF ( inDOFs(el_id,5) > 0 ) THEN
-               Element % BDOFs = inDOFs(el_id,5)
-             ELSE
-               Element % BDOFs = getBubbleDOFs(Element, Element % PDefs % P)
-             END IF
-           END IF
-         END IF
-       END DO
      END IF
 
      CALL SetMeshMaxDOFs(Mesh)
@@ -18019,7 +18005,6 @@ CONTAINS
             IF ( ASSOCIATED( Element % PDefs ) ) THEN
               CALL AllocatePDefinitions(Faces(Face))
               Faces(Face) % PDefs % P = 0
-              Faces(Face) % PDefs % pyramidQuad = .FALSE.
             ELSE
               NULLIFY( Faces(Face) % PDefs )
             END IF
@@ -18039,12 +18024,6 @@ CONTAINS
                   Element % NodeIndexes(FaceMap(k,n2)) 
             END DO
 
-            ! Mark edge as an edge of pydamid square face 
- !          IF (isPBrick(Element)) THEN
-            IF (isPPyramid(Element) ) THEN
-              Faces(Face) % PDefs % pyramidQuad = .TRUE.
-            END IF
-            
             ALLOCATE( Faces(Face) % BoundaryInfo )
             Faces(Face) % BoundaryInfo % Left  => NULL()
             Faces(Face) % BoundaryInfo % Right => NULL()
@@ -18371,7 +18350,6 @@ CONTAINS
             IF ( ASSOCIATED( Element % PDefs ) ) THEN
               CALL AllocatePDefinitions(Edges(Edge))              
               Edges(Edge) % PDefs % P = 0
-              Edges(Edge) % PDefs % pyramidQuad = .FALSE.
             ELSE
               NULLIFY( Edges(Edge) % PDefs )
             END IF            
@@ -18380,12 +18358,6 @@ CONTAINS
           ! Stuff for both existing and new edge
           !--------------------------------------
           Element % EdgeIndexes(k) = Edge
-          
-          ! Mark edge as an edge of pydamid square face 
-!         IF (isPBrick(Element)) THEN
-          IF (isPPyramid(Element) .AND. k < 5) THEN
-            Edges(Edge) % PDefs % pyramidQuad = .TRUE.
-          END IF
           
           IF ( ASSOCIATED(Mesh % Faces) .AND. ASSOCIATED(FaceEdgeMap) ) THEN
             DO ii=1,Element % TYPE % NumberOfFaces
@@ -20271,7 +20243,6 @@ END SUBROUTINE FindNeighbourNodes
            Enew % PDefs = PDefs
 
            ! All elements in actual mesh are not edges
-           Enew % PDefs % pyramidQuad = .FALSE.
            Enew % PDefs % isEdge = .FALSE.
 
            ! If element is of type tetrahedron and is a p element,
