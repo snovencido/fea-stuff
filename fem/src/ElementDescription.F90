@@ -2559,28 +2559,27 @@ CONTAINS
      dim  = Element % TYPE % DIMENSION
      cdim = CoordinateSystemDimension()
 
-     BodyId = Element % BodyId
-     IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
-       Parent => Element % PDefs % LocalParent
-       IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
-     END IF
-     IF (BodyId==0) THEN
-       CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
-       BodyId = 1
-     END IF
-
 
      BasisDegree = 0
      BasisDegree(1:n) = Element % Type % BasisFunctionDegree
 
      IF ( isActivePElement(element) ) THEN
 
+       BodyId = Element % BodyId
+       IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
+         Parent => Element % PDefs % LocalParent
+         IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
+       END IF
+       IF (BodyId==0) THEN
+         CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
+         BodyId = 1
+       END IF
+
        ! Check for need of P basis degrees and set degree of
        ! linear basis if vector asked:
        ! ---------------------------------------------------
        BasisDegree(1:n) = 1
        q = n
-
 
        SerendipityPBasis = Element % PDefs % Serendipity
 !------------------------------------------------------------------------------
@@ -4314,6 +4313,8 @@ CONTAINS
      REAL(KIND=dp) :: dBasisdxWrk(VECTOR_BLOCK_LENGTH,nbmax,3)
      REAL(KIND=dp) :: DetJWrk(VECTOR_BLOCK_LENGTH)
      REAL(KIND=dp) :: LtoGMapsWrk(VECTOR_BLOCK_LENGTH,3,3)
+
+     TYPE(Solver_t), POINTER :: pSolver
      
      INTEGER :: i, l, n, dim, cdim, ll, ncl, lln
      LOGICAL :: elem
@@ -4445,22 +4446,23 @@ CONTAINS
        pSolver => CurrentModel % Solver
      END IF
 
-     BodyId = Element % BodyId
-     IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
-       Parent => Element % PDefs % LocalParent
-       IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
-     END IF
-     IF (BodyId==0) THEN
-       CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
-       BodyId = 1
+     IF( isActivePElement(Element)) THEN
+       BodyId = Element % BodyId
+       IF (BodyId==0 .AND. ASSOCIATED(Element % BoundaryInfo)) THEN
+         Parent => Element % PDefs % LocalParent
+         IF(ASSOCIATED(Parent)) BodyId = Parent % BodyId
+       END IF
+       IF (BodyId==0) THEN
+         CALL Warn('ElementBasisDegree', 'Element has no body index, assuming the index 1')
+         BodyId = 1
+       END IF
+       SerendipityPBasis = Element % PDefs % Serendipity
      END IF
 
      retval = .TRUE.
      n    = Element % TYPE % NumberOfNodes
      dim  = Element % TYPE % DIMENSION
      cdim = CoordinateSystemDimension()
-
-     SerendipityPBasis = Element % PDefs % Serendipity
 
      dBasisdxWrk = 0._dp ! avoid uninitialized stuff depending on coordinate dimension...
 
